@@ -1,0 +1,48 @@
+{
+  "title": "Orchestrator - Ops",
+  "schemaVersion": 38,
+  "version": 1,
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Rate limited (5m)",
+      "targets": [
+        {
+          "expr": "sum(rate(orchestrator_rate_limited_total[5m]))",
+          "legendFormat": "rate_limited"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Circuit open (5m)",
+      "targets": [
+        {
+          "expr": "sum(rate(orchestrator_circuit_open_total[5m]))",
+          "legendFormat": "circuit_open"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Retries (5m)",
+      "targets": [
+        {
+          "expr": "sum(rate(orchestrator_retry_total[5m]))",
+          "legendFormat": "retries"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue depth",
+      "targets": [
+        {
+          "expr": "orchestrator_queue_depth",
+          "legendFormat": "{{queue}} {{state}}"
+        }
+      ]
+    }
+  ]
+}

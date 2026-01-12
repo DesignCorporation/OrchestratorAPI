@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Docker build (api)
+        run: docker build -f services/orchestrator-api/Dockerfile .
+
+      - name: Docker build (worker)
+        run: docker build -f services/orchestrator-worker/Dockerfile .
+
+      - name: Docker build (operator-console)
+        run: docker build -f services/operator-console/Dockerfile .
+
+      - name: Contract tests (docker compose)
+        run: |
+          export STRIPE_WEBHOOK_SECRET=whsec_test_contract
+          docker compose -f infra/docker-compose/docker-compose.dev.yml -p ci up -d --build
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:4100/health >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          pnpm test:contract
+          docker compose -f infra/docker-compose/docker-compose.dev.yml -p ci down -v

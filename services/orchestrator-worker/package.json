@@ -1,0 +1,23 @@
+{
+  "name": "@orchestrator/orchestrator-worker",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsup src/index.ts src/healthcheck.ts --format cjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "bullmq": "^5.12.4",
+    "ioredis": "^5.4.1",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.8.7",
+    "@types/pg": "^8.11.10"
+  }
+}

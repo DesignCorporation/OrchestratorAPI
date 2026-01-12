@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Orchestrator Operator Console</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+        background: radial-gradient(circle at top, #f2f4f8, #e6ebf3);
+        color: #1f2a37;
+      }
+      main {
+        max-width: 860px;
+        margin: 80px auto;
+        padding: 32px;
+        background: #ffffff;
+        border-radius: 20px;
+        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.15);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 32px;
+      }
+      p {
+        margin: 0 0 16px;
+        line-height: 1.6;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-top: 24px;
+      }
+      .toolbar {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+        align-items: center;
+      }
+      .toolbar.stack {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .toolbar.stack button {
+        width: 100%;
+      }
+      button {
+        border: 0;
+        background: #1f2937;
+        color: white;
+        padding: 10px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      input {
+        flex: 1;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #d1d5db;
+      }
+      textarea {
+        width: 100%;
+        min-height: 120px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #d1d5db;
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 16px 0 0;
+      }
+      li {
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 8px;
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 13px;
+        background: #f8fafc;
+      }
+      .card {
+        padding: 16px;
+        border-radius: 14px;
+        background: #f7f9fc;
+        border: 1px solid #e2e8f0;
+      }
+      .section-title {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+      .muted {
+        color: #64748b;
+        font-size: 14px;
+      }
+      .status {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 12px;
+        background: #0f172a;
+        color: #e2e8f0;
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+        max-height: 180px;
+        overflow: auto;
+      }
+      label {
+        font-size: 13px;
+        color: #475569;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .fields {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+      .list {
+        margin-top: 12px;
+        display: grid;
+        gap: 8px;
+      }
+      .list-item {
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        font-size: 13px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Operator Console</h1>
+      <p>Интерфейс для управления оркестратором: наблюдаемость, DLQ, webhooks, audit.</p>
+      <p class="muted">Статус: каркас готов. Ниже — быстрый демо‑сценарий и поток событий.</p>
+      <div class="card">
+        <strong>Happy Path (demo)</strong>
+        <p class="muted">Создаём policy + connector и выполняем test execute.</p>
+        <div class="fields">
+          <div class="field">
+            <label>Connector name</label>
+            <input id="connector-name" value="demo-http" />
+          </div>
+          <div class="field">
+            <label>Base URL</label>
+            <input id="base-url" value="https://postman-echo.com" />
+          </div>
+          <div class="field">
+            <label>Operation path</label>
+            <input id="operation-path" value="/post" />
+          </div>
+        </div>
+        <div class="toolbar stack">
+          <button id="setup-demo">Create policy + connector</button>
+          <button id="run-execute">Run execute</button>
+        </div>
+        <div class="status" id="status"></div>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3 class="section-title">Configs</h3>
+          <p class="muted">Создание, активация, откат версий.</p>
+          <div class="fields">
+            <div class="field">
+              <label>Config name</label>
+              <input id="cfg-name" value="demo-config" />
+            </div>
+            <div class="field">
+              <label>Reason</label>
+              <input id="cfg-reason" placeholder="reason" />
+            </div>
+          </div>
+          <label>Config JSON</label>
+          <textarea id="cfg-json">{\n  \"version\": 1,\n  \"feature_flags\": {\"demo\": true}\n}</textarea>
+          <div class="toolbar stack">
+            <button id="cfg-create">Create config</button>
+            <button id="cfg-load">Load history</button>
+            <button id="cfg-active">Show active</button>
+            <button id="cfg-rollback">Rollback to previous</button>
+          </div>
+          <div class="list" id="cfg-list"></div>
+          <div class="list" id="cfg-active-view"></div>
+        </div>
+        <div class="card">
+          <h3 class="section-title">Policies</h3>
+          <p class="muted">Создание и просмотр policy.</p>
+          <div class="fields">
+            <div class="field">
+              <label>Policy name</label>
+              <input id="policy-name" value="ui-policy" />
+            </div>
+            <div class="field">
+              <label>Reason</label>
+              <input id="policy-reason" placeholder="reason" />
+            </div>
+          </div>
+          <label>Policy JSON</label>
+          <textarea id="policy-json">{\n  \"retry_json\": {\"max_attempts\": 3, \"base_ms\": 250, \"max_ms\": 2000}\n}</textarea>
+          <div class="toolbar stack">
+            <button id="policy-create">Create policy</button>
+            <button id="policy-load">Load policies</button>
+          </div>
+          <div class="list" id="policy-list"></div>
+        </div>
+        <div class="card">
+          <h3 class="section-title">Connectors</h3>
+          <p class="muted">Создание и просмотр connector.</p>
+          <div class="fields">
+            <div class="field">
+              <label>Name</label>
+              <input id="connector-name-ui" value="ui-connector" />
+            </div>
+            <div class="field">
+              <label>Type</label>
+              <input id="connector-type" value="http" />
+            </div>
+            <div class="field">
+              <label>Policy ID (optional)</label>
+              <input id="connector-policy-id" placeholder="uuid" />
+            </div>
+            <div class="field">
+              <label>Secret Ref ID (optional)</label>
+              <input id="connector-secret-id" placeholder="uuid" />
+            </div>
+            <div class="field">
+              <label>Reason</label>
+              <input id="connector-reason" placeholder="reason" />
+            </div>
+          </div>
+          <label>Settings JSON</label>
+          <textarea id="connector-settings">{\n  \"base_url\": \"https://postman-echo.com\",\n  \"method\": \"POST\"\n}</textarea>
+          <div class="toolbar stack">
+            <button id="connector-create">Create connector</button>
+            <button id="connector-load">Load connectors</button>
+          </div>
+          <div class="list" id="connector-list"></div>
+        </div>
+        <div class="card">
+          <h3 class="section-title">Audit</h3>
+          <p class="muted">Последние operator actions.</p>
+          <div class="fields">
+            <div class="field">
+              <label>Limit</label>
+              <input id="audit-limit" value="50" />
+            </div>
+            <div class="field">
+              <label>Action (optional)</label>
+              <input id="audit-action" placeholder="connector.create" />
+            </div>
+            <div class="field">
+              <label>Operator ID (optional)</label>
+              <input id="audit-operator" placeholder="uuid" />
+            </div>
+          </div>
+          <div class="toolbar stack">
+            <button id="audit-load">Load audit logs</button>
+          </div>
+          <div class="list" id="audit-list"></div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button id="connect">Connect SSE</button>
+        <button id="load">Load last 50</button>
+      </div>
+      <ul id="events"></ul>
+      <div class="grid">
+        <div class="card">
+          <strong>Events</strong>
+          <p class="muted">SSE поток событий и фильтры.</p>
+        </div>
+        <div class="card">
+          <strong>Webhook Inbox</strong>
+          <p class="muted">Состояние входящих вебхуков.</p>
+        </div>
+        <div class="card">
+          <strong>DLQ</strong>
+          <p class="muted">Replay, purge и аудит.</p>
+        </div>
+        <div class="card">
+          <strong>Control Plane</strong>
+          <p class="muted">/events, /admin/dlq, /jobs</p>
+        </div>
+      </div>
+    </main>
+    <script>
+      const list = document.getElementById('events');
+      const connectBtn = document.getElementById('connect');
+      const loadBtn = document.getElementById('load');
+      const statusBox = document.getElementById('status');
+      const setupBtn = document.getElementById('setup-demo');
+      const executeBtn = document.getElementById('run-execute');
+      const connectorName = document.getElementById('connector-name');
+      const baseUrl = document.getElementById('base-url');
+      const operationPath = document.getElementById('operation-path');
+      const cfgName = document.getElementById('cfg-name');
+      const cfgReason = document.getElementById('cfg-reason');
+      const cfgJson = document.getElementById('cfg-json');
+      const cfgCreate = document.getElementById('cfg-create');
+      const cfgLoad = document.getElementById('cfg-load');
+      const cfgActive = document.getElementById('cfg-active');
+      const cfgRollback = document.getElementById('cfg-rollback');
+      const cfgList = document.getElementById('cfg-list');
+      const cfgActiveView = document.getElementById('cfg-active-view');
+      const policyName = document.getElementById('policy-name');
+      const policyReason = document.getElementById('policy-reason');
+      const policyJson = document.getElementById('policy-json');
+      const policyCreate = document.getElementById('policy-create');
+      const policyLoad = document.getElementById('policy-load');
+      const policyList = document.getElementById('policy-list');
+      const connectorNameUi = document.getElementById('connector-name-ui');
+      const connectorType = document.getElementById('connector-type');
+      const connectorPolicyId = document.getElementById('connector-policy-id');
+      const connectorSecretId = document.getElementById('connector-secret-id');
+      const connectorReason = document.getElementById('connector-reason');
+      const connectorSettings = document.getElementById('connector-settings');
+      const connectorCreate = document.getElementById('connector-create');
+      const connectorLoad = document.getElementById('connector-load');
+      const connectorList = document.getElementById('connector-list');
+      const auditLimit = document.getElementById('audit-limit');
+      const auditAction = document.getElementById('audit-action');
+      const auditOperator = document.getElementById('audit-operator');
+      const auditLoad = document.getElementById('audit-load');
+      const auditList = document.getElementById('audit-list');
+      const state = { policyId: null, connectorId: null };
+      let source = null;
+
+      function addEvent(data) {
+        const li = document.createElement('li');
+        li.textContent = data;
+        list.prepend(li);
+      }
+
+      function logStatus(message, data) {
+        const time = new Date().toISOString().slice(11, 19);
+        const line = `[${time}] ${message}${data ? ' ' + JSON.stringify(data) : ''}`;
+        const item = document.createElement('div');
+        item.textContent = line;
+        statusBox.prepend(item);
+      }
+
+      async function callApi(path, options = {}) {
+        const res = await fetch(path, {
+          headers: { 'content-type': 'application/json' },
+          ...options
+        });
+        const text = await res.text();
+        let payload = null;
+        try {
+          payload = JSON.parse(text);
+        } catch (error) {
+          payload = { raw: text };
+        }
+        if (!res.ok) {
+          throw new Error(`${res.status}: ${JSON.stringify(payload)}`);
+        }
+        return payload;
+      }
+
+      function parseJsonInput(value) {
+        if (!value || !value.trim()) return {};
+        try {
+          return JSON.parse(value);
+        } catch (error) {
+          throw new Error('invalid_json');
+        }
+      }
+
+      function renderList(container, items, format) {
+        container.innerHTML = '';
+        items.forEach((item) => {
+          const div = document.createElement('div');
+          div.className = 'list-item';
+          div.innerHTML = format(item);
+          container.appendChild(div);
+        });
+      }
+
+      connectBtn.addEventListener('click', () => {
+        if (source) source.close();
+        source = new EventSource('/api/events/stream');
+        source.onmessage = (event) => addEvent(event.data);
+        source.onerror = () => addEvent('sse error');
+      });
+
+      loadBtn.addEventListener('click', async () => {
+        const res = await fetch('/api/events?limit=50');
+        const json = await res.json();
+        list.innerHTML = '';
+        (json.events || []).forEach((event) => addEvent(JSON.stringify(event)));
+      });
+
+      setupBtn.addEventListener('click', async () => {
+        try {
+          const policy = await callApi('/api/policies', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: 'demo-policy',
+              reason: 'demo setup',
+              retry_json: { max_attempts: 3, base_ms: 300, max_ms: 2000 },
+              timeout_json: { total_ms: 8000 },
+              rate_limit_json: { max_requests: 20, interval_ms: 60000, scope: 'tenant' },
+              circuit_breaker_json: { enabled: true, failure_threshold: 3, window_ms: 60000, open_ms: 15000 }
+            })
+          });
+          state.policyId = policy.id;
+          logStatus('policy создан', policy);
+
+          const connector = await callApi('/api/connectors', {
+            method: 'POST',
+            body: JSON.stringify({
+              type: 'http',
+              name: connectorName.value || 'demo-http',
+              reason: 'demo setup',
+              policy_id: state.policyId,
+              settings: {
+                base_url: baseUrl.value || 'https://postman-echo.com',
+                method: 'POST'
+              }
+            })
+          });
+          state.connectorId = connector.id;
+          logStatus('connector создан', connector);
+        } catch (error) {
+          logStatus('ошибка', { error: error.message });
+        }
+      });
+
+      executeBtn.addEventListener('click', async () => {
+        try {
+          if (!state.connectorId) {
+            logStatus('нет connector_id, сначала Create policy + connector');
+            return;
+          }
+          const result = await callApi('/api/execute', {
+            method: 'POST',
+            body: JSON.stringify({
+              connector: { id: state.connectorId },
+              operation: operationPath.value || '/post',
+              input: { hello: 'world', ts: new Date().toISOString() }
+            })
+          });
+          logStatus('execute ok', result);
+        } catch (error) {
+          logStatus('execute ошибка', { error: error.message });
+        }
+      });
+
+      cfgCreate.addEventListener('click', async () => {
+        try {
+          const config = parseJsonInput(cfgJson.value);
+          const res = await callApi('/api/configs', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: cfgName.value,
+              reason: cfgReason.value || 'ui',
+              config
+            })
+          });
+          logStatus('config создан', res);
+        } catch (error) {
+          logStatus('config ошибка', { error: error.message });
+        }
+      });
+
+      cfgLoad.addEventListener('click', async () => {
+        try {
+          const [res, active] = await Promise.all([
+            callApi(`/api/configs?name=${encodeURIComponent(cfgName.value)}`),
+            callApi(`/api/configs/active?name=${encodeURIComponent(cfgName.value)}`).catch(() => ({ active: null }))
+          ]);
+          const configs = res.configs || [];
+          const activeId = active.active ? active.active.config_id : null;
+          renderList(cfgList, configs, (cfg) => {
+            const isActive = cfg.id === activeId;
+            const badge = isActive ? '<span class=\"muted\">(active)</span>' : '';
+            return `<div class=\"row\"><strong>${cfg.name}</strong> v${cfg.version} ${badge} <button data-id=\"${cfg.id}\">Activate</button></div>`;
+          });
+          cfgList.querySelectorAll('button').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              const id = btn.getAttribute('data-id');
+              try {
+                const resp = await callApi('/api/configs/activate', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    name: cfgName.value,
+                    config_id: id,
+                    reason: cfgReason.value || 'rollback'
+                  })
+                });
+                logStatus('config activated', resp);
+              } catch (error) {
+                logStatus('activate ошибка', { error: error.message });
+              }
+            });
+          });
+        } catch (error) {
+          logStatus('load configs ошибка', { error: error.message });
+        }
+      });
+
+      cfgActive.addEventListener('click', async () => {
+        try {
+          const res = await callApi(`/api/configs/active?name=${encodeURIComponent(cfgName.value)}`);
+          renderList(cfgActiveView, [res.active], (item) => {
+            return `<div><strong>active</strong> v${item.version} (${item.config_id})</div>`;
+          });
+        } catch (error) {
+          logStatus('active ошибка', { error: error.message });
+        }
+      });
+
+      cfgRollback.addEventListener('click', async () => {
+        try {
+          const [res, active] = await Promise.all([
+            callApi(`/api/configs?name=${encodeURIComponent(cfgName.value)}`),
+            callApi(`/api/configs/active?name=${encodeURIComponent(cfgName.value)}`)
+          ]);
+          const configs = (res.configs || []).slice().sort((a, b) => b.version - a.version);
+          const activeVersion = active.active?.version;
+          if (!activeVersion) {
+            logStatus('rollback: active config not found');
+            return;
+          }
+          const previous = configs.find((cfg) => cfg.version < activeVersion);
+          if (!previous) {
+            logStatus('rollback: previous version not found');
+            return;
+          }
+          const resp = await callApi('/api/configs/activate', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: cfgName.value,
+              config_id: previous.id,
+              reason: cfgReason.value || 'rollback'
+            })
+          });
+          logStatus('rollback ok', resp);
+        } catch (error) {
+          logStatus('rollback ошибка', { error: error.message });
+        }
+      });
+
+      policyCreate.addEventListener('click', async () => {
+        try {
+          const policyFields = parseJsonInput(policyJson.value);
+          const res = await callApi('/api/policies', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: policyName.value,
+              reason: policyReason.value || 'ui',
+              ...policyFields
+            })
+          });
+          logStatus('policy создан', res);
+        } catch (error) {
+          logStatus('policy ошибка', { error: error.message });
+        }
+      });
+
+      policyLoad.addEventListener('click', async () => {
+        try {
+          const res = await callApi('/api/policies');
+          renderList(policyList, res.policies || [], (policy) => {
+            return `<div><strong>${policy.name}</strong> (${policy.id})</div>`;
+          });
+        } catch (error) {
+          logStatus('load policies ошибка', { error: error.message });
+        }
+      });
+
+      connectorCreate.addEventListener('click', async () => {
+        try {
+          const settings = parseJsonInput(connectorSettings.value);
+          const res = await callApi('/api/connectors', {
+            method: 'POST',
+            body: JSON.stringify({
+              type: connectorType.value,
+              name: connectorNameUi.value,
+              reason: connectorReason.value || 'ui',
+              policy_id: connectorPolicyId.value || null,
+              secret_ref_id: connectorSecretId.value || null,
+              settings
+            })
+          });
+          logStatus('connector создан', res);
+        } catch (error) {
+          logStatus('connector ошибка', { error: error.message });
+        }
+      });
+
+      connectorLoad.addEventListener('click', async () => {
+        try {
+          const res = await callApi('/api/connectors');
+          renderList(connectorList, res.connectors || [], (connector) => {
+            return `<div><strong>${connector.name}</strong> (${connector.type}) <span class=\"muted\">${connector.id}</span></div>`;
+          });
+        } catch (error) {
+          logStatus('load connectors ошибка', { error: error.message });
+        }
+      });
+
+      auditLoad.addEventListener('click', async () => {
+        try {
+          const params = new URLSearchParams();
+          if (auditLimit.value) params.set('limit', auditLimit.value);
+          if (auditAction.value) params.set('action', auditAction.value);
+          if (auditOperator.value) params.set('operator_id', auditOperator.value);
+          const res = await callApi(`/api/audit-logs?${params.toString()}`);
+          renderList(auditList, res.audits || [], (row) => {
+            return `<div><strong>${row.action}</strong> ${row.resource_type}:${row.resource_id} <span class=\"muted\">${row.created_at}</span></div>`;
+          });
+        } catch (error) {
+          logStatus('audit ошибка', { error: error.message });
+        }
+      });
+    </script>
+  </body>
+</html>

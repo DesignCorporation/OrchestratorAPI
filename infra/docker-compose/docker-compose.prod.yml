@@ -1,0 +1,232 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: orchestrator
+      POSTGRES_PASSWORD: orchestrator
+      POSTGRES_DB: orchestrator
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orchestrator -d orchestrator"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: always
+    networks:
+      - internal
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: always
+    networks:
+      - internal
+    volumes:
+      - redis_data:/data
+
+  orchestrator-control:
+    image: ghcr.io/designcorporation/orchestrator-api:${ORCHESTRATOR_IMAGE_TAG:-latest}
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      PORT: 4000
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL}
+      ORCH_JWT_ISSUER: ${ORCH_JWT_ISSUER}
+      ORCH_JWT_AUDIENCE_CONTROL: ${ORCH_JWT_AUDIENCE_CONTROL}
+      ORCH_JWT_AUDIENCE_EXEC: ${ORCH_JWT_AUDIENCE_EXEC}
+      ORCH_JWT_JWKS_URL: ${ORCH_JWT_JWKS_URL}
+      ORCH_JWT_SHARED_SECRET: ${ORCH_JWT_SHARED_SECRET}
+      ORCH_IMPERSONATION_SECRET: ${ORCH_IMPERSONATION_SECRET}
+      IMPERSONATION_TTL_MINUTES: ${IMPERSONATION_TTL_MINUTES:-15}
+      IMPERSONATION_HEADERS_ALLOWED: ${IMPERSONATION_HEADERS_ALLOWED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+      PAYLOAD_STORE_ENDPOINT: ${PAYLOAD_STORE_ENDPOINT}
+      PAYLOAD_STORE_BUCKET: ${PAYLOAD_STORE_BUCKET}
+      PAYLOAD_STORE_ACCESS_KEY: ${PAYLOAD_STORE_ACCESS_KEY}
+      PAYLOAD_STORE_SECRET_KEY: ${PAYLOAD_STORE_SECRET_KEY}
+      PAYLOAD_STORE_REGION: ${PAYLOAD_STORE_REGION:-us-east-1}
+      PAYLOAD_STORE_PREFIX: ${PAYLOAD_STORE_PREFIX:-payloads}
+      PAYLOAD_STORE_THRESHOLD_BYTES: ${PAYLOAD_STORE_THRESHOLD_BYTES:-20000}
+      PAYLOAD_STORE_FORCE_PATH_STYLE: ${PAYLOAD_STORE_FORCE_PATH_STYLE:-false}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_API_KEY: ${STRIPE_API_KEY}
+      WEBHOOK_QUEUE: ${WEBHOOK_QUEUE:-webhook}
+      DEFAULT_QUEUE: ${DEFAULT_QUEUE:-default}
+      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID}
+      DEFAULT_MAX_ATTEMPTS: ${DEFAULT_MAX_ATTEMPTS:-4}
+      AUTH_MODE: ${AUTH_MODE:-enabled}
+      API_MODE: control
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: always
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - internal
+      - public
+    ports:
+      - "127.0.0.1:4000:4000"
+
+  orchestrator-exec:
+    image: ghcr.io/designcorporation/orchestrator-api:${ORCHESTRATOR_IMAGE_TAG:-latest}
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      PORT: 4001
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL}
+      ORCH_JWT_ISSUER: ${ORCH_JWT_ISSUER}
+      ORCH_JWT_AUDIENCE_CONTROL: ${ORCH_JWT_AUDIENCE_CONTROL}
+      ORCH_JWT_AUDIENCE_EXEC: ${ORCH_JWT_AUDIENCE_EXEC}
+      ORCH_JWT_JWKS_URL: ${ORCH_JWT_JWKS_URL}
+      ORCH_JWT_SHARED_SECRET: ${ORCH_JWT_SHARED_SECRET}
+      ORCH_IMPERSONATION_SECRET: ${ORCH_IMPERSONATION_SECRET}
+      IMPERSONATION_TTL_MINUTES: ${IMPERSONATION_TTL_MINUTES:-15}
+      IMPERSONATION_HEADERS_ALLOWED: ${IMPERSONATION_HEADERS_ALLOWED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+      PAYLOAD_STORE_ENDPOINT: ${PAYLOAD_STORE_ENDPOINT}
+      PAYLOAD_STORE_BUCKET: ${PAYLOAD_STORE_BUCKET}
+      PAYLOAD_STORE_ACCESS_KEY: ${PAYLOAD_STORE_ACCESS_KEY}
+      PAYLOAD_STORE_SECRET_KEY: ${PAYLOAD_STORE_SECRET_KEY}
+      PAYLOAD_STORE_REGION: ${PAYLOAD_STORE_REGION:-us-east-1}
+      PAYLOAD_STORE_PREFIX: ${PAYLOAD_STORE_PREFIX:-payloads}
+      PAYLOAD_STORE_THRESHOLD_BYTES: ${PAYLOAD_STORE_THRESHOLD_BYTES:-20000}
+      PAYLOAD_STORE_FORCE_PATH_STYLE: ${PAYLOAD_STORE_FORCE_PATH_STYLE:-false}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_API_KEY: ${STRIPE_API_KEY}
+      WEBHOOK_QUEUE: ${WEBHOOK_QUEUE:-webhook}
+      DEFAULT_QUEUE: ${DEFAULT_QUEUE:-default}
+      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID}
+      DEFAULT_MAX_ATTEMPTS: ${DEFAULT_MAX_ATTEMPTS:-4}
+      AUTH_MODE: ${AUTH_MODE:-enabled}
+      API_MODE: exec
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4001/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: always
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - internal
+
+  orchestrator-worker:
+    image: ghcr.io/designcorporation/orchestrator-worker:${ORCHESTRATOR_IMAGE_TAG:-latest}
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+      WEBHOOK_QUEUE: ${WEBHOOK_QUEUE:-webhook}
+      DEFAULT_QUEUE: ${DEFAULT_QUEUE:-default}
+      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID}
+      RETENTION_INTERVAL_MINUTES: ${RETENTION_INTERVAL_MINUTES:-1440}
+      EVENT_LOG_TTL_DAYS: ${EVENT_LOG_TTL_DAYS:-30}
+      REQUEST_LOG_TTL_DAYS: ${REQUEST_LOG_TTL_DAYS:-30}
+      WEBHOOK_INBOX_TTL_DAYS: ${WEBHOOK_INBOX_TTL_DAYS:-14}
+      JOB_TTL_DAYS: ${JOB_TTL_DAYS:-14}
+      OPERATOR_AUDIT_TTL_DAYS: ${OPERATOR_AUDIT_TTL_DAYS:-365}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "/app/services/orchestrator-worker/dist/healthcheck.js"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - internal
+
+  orchestrator-migrate:
+    image: postgres:16-alpine
+    command: ["/bin/sh", "-c", "for file in /migrations/*.sql; do psql \"$DATABASE_URL\" -f \"$$file\"; done"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+    volumes:
+      - ../migrations:/migrations:ro
+    profiles: ["migrations"]
+
+  operator-console:
+    image: ghcr.io/designcorporation/operator-console:${OPERATOR_CONSOLE_IMAGE_TAG:-latest}
+    environment:
+      PORT: 4002
+      NODE_ENV: production
+      CONTROL_PLANE_URL: http://orchestrator-control:4000
+      EXEC_PLANE_URL: http://orchestrator-exec:4000
+      CONTROL_PLANE_TOKEN: ${CONTROL_PLANE_TOKEN}
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4002/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - internal
+      - public
+    ports:
+      - "127.0.0.1:4002:4002"
+
+networks:
+  internal:
+    driver: bridge
+  public:
+    external: true
+    name: public
+
+volumes:
+  postgres_data:
+  redis_data:

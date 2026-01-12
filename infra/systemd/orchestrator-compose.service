@@ -1,0 +1,16 @@
+[Unit]
+Description=OrchestratorAPI Docker Compose
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/orchestrator
+EnvironmentFile=/opt/orchestrator/.env.prod
+ExecStart=/usr/bin/docker compose --env-file /opt/orchestrator/.env -f /opt/orchestrator/infra/docker-compose/docker-compose.prod.yml up -d
+ExecStop=/usr/bin/docker compose --env-file /opt/orchestrator/.env -f /opt/orchestrator/infra/docker-compose/docker-compose.prod.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
