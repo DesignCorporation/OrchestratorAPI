@@ -891,10 +891,11 @@ function registerRoutes() {
             : timeoutMs;
         const timeout = setTimeout(() => controller.abort(), attemptTimeoutMs);
         try {
+          const sendBody = method.toUpperCase() !== 'GET' && method.toUpperCase() !== 'HEAD';
           const upstream = await fetch(url, {
             method,
             headers,
-            body: JSON.stringify(body.input ?? {}),
+            body: sendBody ? JSON.stringify(body.input ?? {}) : undefined,
             signal: controller.signal
           });
           upstreamStatus = upstream.status;
