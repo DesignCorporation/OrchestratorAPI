@@ -100,8 +100,8 @@ async function processJob(jobId: string, jobName: string, context?: { correlatio
   const jobType = hasJobMeta ? jobMeta.rows[0].type : jobName;
   const runId = randomUUID();
   await pgPool.query(
-    `INSERT INTO run (id, job_id, status) VALUES ($1, $2, $3)`,
-    [runId, jobId, 'running']
+    `INSERT INTO run (id, job_id, tenant_id, status) VALUES ($1, $2, $3, $4)`,
+    [runId, jobId, tenantId, 'running']
   );
   await pgPool.query(`UPDATE job SET status = $1, attempts = attempts + 1, updated_at = now() WHERE id = $2`, [
     'running',
