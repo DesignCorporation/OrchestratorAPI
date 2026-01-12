@@ -181,7 +181,7 @@ services:
 
   orchestrator-migrate:
     image: postgres:16-alpine
-    command: ["/bin/sh", "-c", "for file in /migrations/*.sql; do psql \"$DATABASE_URL\" -f \"$$file\"; done"]
+    command: ["/bin/sh", "-c", "for file in /migrations/*.sql; do psql \"$$DATABASE_URL\" -f \"$$file\"; done"]
     environment:
       DATABASE_URL: ${DATABASE_URL}
     depends_on:

@@ -48,7 +48,7 @@ jobs:
         run: |
           export STRIPE_WEBHOOK_SECRET=whsec_test_contract
           docker compose -f infra/docker-compose/docker-compose.dev.yml -p ci up -d --build
-          docker compose -f infra/docker-compose/docker-compose.dev.yml -p ci run --rm -e DATABASE_URL=postgres://orchestrator:orchestrator@postgres:5432/orchestrator orchestrator-migrate
+          docker compose -f infra/docker-compose/docker-compose.dev.yml -p ci run --rm orchestrator-migrate
           for i in $(seq 1 30); do
             if curl -fsS http://localhost:4100/health >/dev/null; then
               break

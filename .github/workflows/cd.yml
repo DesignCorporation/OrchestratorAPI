@@ -54,7 +54,7 @@ jobs:
             fi
             sleep 2
           done
-          docker compose -f infra/docker-compose/docker-compose.dev.yml run --rm -e DATABASE_URL=postgres://orchestrator:orchestrator@postgres:5432/orchestrator orchestrator-migrate
+          docker compose -f infra/docker-compose/docker-compose.dev.yml run --rm orchestrator-migrate
 
       - name: Contract tests
         run: pnpm -C services/orchestrator-api test:contract
