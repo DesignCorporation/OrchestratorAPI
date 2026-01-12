@@ -131,7 +131,7 @@ jobs:
             echo "Logging in to GHCR"
             echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
             cd ${{ secrets.DEPLOY_PATH }}
-            ORCHESTRATOR_IMAGE_TAG=${{ github.sha }} OPERATOR_CONSOLE_IMAGE_TAG=${{ github.sha }} docker compose -f infra/docker-compose/docker-compose.prod.yml pull
-            ORCHESTRATOR_IMAGE_TAG=${{ github.sha }} OPERATOR_CONSOLE_IMAGE_TAG=${{ github.sha }} docker compose -f infra/docker-compose/docker-compose.prod.yml run --rm orchestrator-migrate
-            ORCHESTRATOR_IMAGE_TAG=${{ github.sha }} OPERATOR_CONSOLE_IMAGE_TAG=${{ github.sha }} docker compose -f infra/docker-compose/docker-compose.prod.yml up -d
+            ORCHESTRATOR_IMAGE_TAG=${{ github.sha }} OPERATOR_CONSOLE_IMAGE_TAG=${{ github.sha }} docker compose --env-file .env.prod -f infra/docker-compose/docker-compose.prod.yml pull
+            ORCHESTRATOR_IMAGE_TAG=${{ github.sha }} OPERATOR_CONSOLE_IMAGE_TAG=${{ github.sha }} docker compose --env-file .env.prod -f infra/docker-compose/docker-compose.prod.yml run --rm orchestrator-migrate
+            ORCHESTRATOR_IMAGE_TAG=${{ github.sha }} OPERATOR_CONSOLE_IMAGE_TAG=${{ github.sha }} docker compose --env-file .env.prod -f infra/docker-compose/docker-compose.prod.yml up -d
             docker image prune -f
