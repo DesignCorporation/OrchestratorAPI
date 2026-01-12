@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import path from 'path';
+import fs from 'fs';
 
 const app = Fastify({ logger: true });
 
@@ -17,7 +18,15 @@ app.register(fastifyStatic, {
 
 const controlPlaneUrl = process.env.CONTROL_PLANE_URL || 'http://orchestrator-control:4000';
 const execPlaneUrl = process.env.EXEC_PLANE_URL || '';
-const serviceToken = process.env.CONTROL_PLANE_TOKEN || '';
+const serviceTokenFile = process.env.CONTROL_PLANE_TOKEN_FILE || '';
+let serviceToken = process.env.CONTROL_PLANE_TOKEN || '';
+if (!serviceToken && serviceTokenFile) {
+  try {
+    serviceToken = fs.readFileSync(serviceTokenFile, 'utf8').trim();
+  } catch {
+    serviceToken = '';
+  }
+}
 
 app.get('/health', async () => {
   return { status: 'ok' };

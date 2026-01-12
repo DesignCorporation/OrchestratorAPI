@@ -201,6 +201,7 @@ services:
       CONTROL_PLANE_URL: http://orchestrator-control:4000
       EXEC_PLANE_URL: http://orchestrator-exec:4000
       CONTROL_PLANE_TOKEN: ${CONTROL_PLANE_TOKEN}
+      CONTROL_PLANE_TOKEN_FILE: ${CONTROL_PLANE_TOKEN_FILE:-/run/secrets/control_plane_token}
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:4002/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
       interval: 10s
@@ -219,6 +220,8 @@ services:
       - public
     ports:
       - "127.0.0.1:4002:4002"
+    secrets:
+      - control_plane_token
 
 networks:
   internal:
@@ -230,3 +233,7 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+
+secrets:
+  control_plane_token:
+    file: /opt/orchestrator/secrets/control_plane_token

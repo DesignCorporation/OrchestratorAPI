@@ -7,6 +7,13 @@
 - Basic auth применяется на `operator.*`
 - `AUTH_MODE=enabled` в prod
 - `IMPERSONATION_HEADERS_ALLOWED=false` в prod
+- Operator Console использует service token из `CONTROL_PLANE_TOKEN` или файла `CONTROL_PLANE_TOKEN_FILE`
+
+### Где взять service token (prod)
+На VM:
+```bash
+sudo cat /opt/orchestrator/secrets/control_plane_token
+```
 
 ## PROD checks
 
