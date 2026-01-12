@@ -89,7 +89,7 @@ test('contract: execute/jobs/webhooks', async () => {
     name: 'contract-timeout',
     reason: 'contract test',
     policy_id: timeoutPolicyId,
-    settings: { base_url: 'https://httpstat.us', method: 'GET' }
+    settings: { base_url: 'http://orchestrator-api:4100', method: 'GET' }
   });
   assert.equal(timeoutConnector.status, 201);
   const timeoutConnectorId = (timeoutConnector.json as { id: string }).id;
@@ -161,7 +161,7 @@ test('contract: execute/jobs/webhooks', async () => {
 
   const timeoutRes = await request('POST', '/execute', {
     connector: { id: timeoutConnectorId },
-    operation: '/200?sleep=5000',
+    operation: '/__test/delay?ms=5000',
     input: {}
   });
   assert.equal(timeoutRes.status, 504);

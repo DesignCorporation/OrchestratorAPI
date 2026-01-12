@@ -222,6 +222,21 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function asObject(value: unknown): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  if (typeof value === 'object') {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
 function hashPayload(payload: unknown): string {
   return createHash('sha256').update(JSON.stringify(payload ?? {})).digest('hex');
 }
@@ -355,7 +370,7 @@ async function resolveSecret(ref: string): Promise<string | null> {
 
 function getRateLimitConfig(policySettings: Record<string, unknown> | null) {
   if (!policySettings) return null;
-  const rateLimit = (policySettings as { rate_limit_json?: Record<string, unknown> }).rate_limit_json || {};
+  const rateLimit = asObject((policySettings as { rate_limit_json?: unknown }).rate_limit_json);
   const maxRequests = typeof rateLimit.max_requests === 'number' ? rateLimit.max_requests : null;
   const intervalMs = typeof rateLimit.interval_ms === 'number' ? rateLimit.interval_ms : null;
   if (!maxRequests || !intervalMs || maxRequests <= 0 || intervalMs <= 0) {
@@ -388,7 +403,7 @@ async function checkRateLimit(tenantId: string, connectorId: string, policySetti
 
 function getCircuitBreakerConfig(policySettings: Record<string, unknown> | null) {
   if (!policySettings) return null;
-  const cb = (policySettings as { circuit_breaker_json?: Record<string, unknown> }).circuit_breaker_json || {};
+  const cb = asObject((policySettings as { circuit_breaker_json?: unknown }).circuit_breaker_json);
   const enabled =
     typeof cb.enabled === 'boolean' ? cb.enabled : Object.keys(cb).length > 0;
   if (!enabled) return null;
@@ -459,6 +474,17 @@ function registerRoutes() {
   app.get('/health/live', async () => {
     return { status: 'ok' };
   });
+
+  if (process.env.ENABLE_TEST_ROUTES === 'true') {
+    app.get('/__test/delay', async (request, reply) => {
+      const query = request.query as { ms?: string };
+      const ms = Math.min(Number(query.ms || 0), 30000);
+      if (ms > 0) {
+        await sleep(ms);
+      }
+      return reply.status(200).send({ delayed_ms: ms });
+    });
+  }
 
   app.post('/webhooks/stripe', { config: { rawBody: true } }, async (request, reply) => {
   const { requestId, traceId } = getContext(request as { headers: Record<string, unknown> });
@@ -766,8 +792,8 @@ function registerRoutes() {
       ? await pgPool.query('SELECT * FROM policy WHERE id = $1 AND tenant_id = $2', [connector.policy_id, tenantId])
       : { rowCount: 0, rows: [] };
     const policySettings = (policy.rowCount ?? 0) > 0 ? policy.rows[0] : null;
-    const retryJson = policySettings?.retry_json || {};
-    const timeoutJson = policySettings?.timeout_json || {};
+    const retryJson = asObject((policySettings as { retry_json?: unknown })?.retry_json);
+    const timeoutJson = asObject((policySettings as { timeout_json?: unknown })?.timeout_json);
     const maxAttempts =
       typeof retryJson.max_attempts === 'number' ? retryJson.max_attempts : Number(process.env.DEFAULT_MAX_ATTEMPTS || 4);
     const baseBackoffMs = typeof retryJson.base_ms === 'number' ? retryJson.base_ms : 250;
