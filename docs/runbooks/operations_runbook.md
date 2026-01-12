@@ -7,6 +7,10 @@
 - Dev operator: `https://operator.dev.orch.designcorp.eu`
 - Exec plane is internal only.
 
+## Runtime layout
+- Dev workspace: `/home/deploy/projects/OrchestratorAPI`
+- Prod runtime: `/opt/orchestrator`
+
 ## Health checks
 - API: `GET /health` (expects `200` and db/redis checks).
 - Operator: `GET /health` on operator console service.
@@ -18,6 +22,10 @@ Deployment is automatic via GitHub Actions:
   - `docker compose pull`
   - `docker compose run --rm orchestrator-migrate`
   - `docker compose up -d`
+
+Required GitHub Actions secrets:
+- `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PORT`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`
+- `GHCR_USER`, `GHCR_TOKEN`
 
 Manual deploy (fallback):
 ```

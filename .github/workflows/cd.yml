@@ -5,6 +5,11 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -39,7 +44,15 @@ jobs:
         run: pnpm build
 
       - name: Start services for contract tests
-        run: docker compose -f infra/docker-compose/docker-compose.dev.yml up -d
+        run: |
+          export STRIPE_WEBHOOK_SECRET=whsec_test_contract
+          docker compose -f infra/docker-compose/docker-compose.dev.yml up -d
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:4100/health >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
 
       - name: Contract tests
         run: pnpm -C services/orchestrator-api test:contract
