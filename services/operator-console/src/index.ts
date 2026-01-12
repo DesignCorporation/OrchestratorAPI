@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import path from 'path';
 
@@ -40,7 +41,7 @@ app.get('/api/events', async (request, reply) => {
   return reply.send(body);
 });
 
-function buildHeaders(request: typeof app.request): Record<string, string> {
+function buildHeaders(request: FastifyRequest): Record<string, string> {
   const headers: Record<string, string> = {};
   if (serviceToken) {
     headers.authorization = `Bearer ${serviceToken}`;
@@ -58,7 +59,7 @@ function buildHeaders(request: typeof app.request): Record<string, string> {
   return headers;
 }
 
-async function proxyJson(request: typeof app.request, reply: typeof app.reply, url: URL, method = 'GET') {
+async function proxyJson(request: FastifyRequest, reply: FastifyReply, url: URL, method = 'GET') {
   const headers = buildHeaders(request);
   if (method !== 'GET') {
     headers['content-type'] = 'application/json';
