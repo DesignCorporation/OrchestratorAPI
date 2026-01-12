@@ -69,10 +69,10 @@ sudo systemctl reload nginx
 ```
 
 ## Security checks
-Use `docs/runbooks/security_verification_runbook.md` for auth/allowlist checks.
+Use `docs/08_runbooks/security_verification_runbook.md` for auth/allowlist checks.
 
 ## Retention cleanup
-Nightly cleanup runs in worker. See `docs/runbooks/retention_cleanup.md`.
+Nightly cleanup runs in worker. See `docs/08_runbooks/retention_cleanup.md`.
 
 ## Common incidents
 - 502 from Nginx: check container health and `docker compose ps`.

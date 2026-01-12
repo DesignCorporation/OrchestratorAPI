@@ -1,0 +1,175 @@
+# API контракт (MVP)
+
+Минимальный контракт, чтобы:
+- строить UI Operator Console
+- единообразно логировать/трассировать вызовы
+- обеспечить идемпотентность и дедупликацию
+
+## Общие правила (headers/ids)
+
+**Correlation/Tracing**
+- `x-request-id` — входящий request id (если нет, генерируем).
+- `traceparent` — W3C Trace Context (если нет, создаём новый trace).
+- `x-correlation-id` — опционально (если клиент хочет связать несколько вызовов). По умолчанию = `x-request-id`.
+
+**Idempotency**
+- `Idempotency-Key` — для `/execute` и `/jobs` (опционально, но рекомендуется для клиентов).
+
+**Tenant context**
+- Внутренние сервисы передают tenant в JWT claim `tid`.
+- Внешние webhooks определяют tenant по endpoint mapping (MVP: один tenant; v1: routing table по `:provider` + `account_id`/`signing_secret`).
+
+## Единый формат ошибок
+
+**HTTP status + тело**
+```json
+{
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "Rate limit exceeded",
+    "details": {"limit": 10, "window_s": 1}
+  },
+  "request_id": "...",
+  "trace_id": "..."
+}
+```
+
+**Коды ошибок (MVP)**
+- `VALIDATION_ERROR` (400)
+- `AUTH_REQUIRED` (401)
+- `FORBIDDEN` (403)
+- `TENANT_NOT_FOUND` (404)
+- `CONNECTOR_NOT_FOUND` (404)
+- `POLICY_VIOLATION` (422)
+- `RATE_LIMITED` (429)
+- `CIRCUIT_OPEN` (503)
+- `UPSTREAM_TIMEOUT` (504)
+- `UPSTREAM_ERROR` (502)
+- `IDEMPOTENCY_CONFLICT` (409)
+- `DUPLICATE_EVENT` (200/202 с флагом)
+- `INTERNAL_ERROR` (500)
+
+## `POST /execute` (sync)
+
+**Назначение:** синхронный вызов коннектора/операции с применением политики.
+
+**Request**
+```json
+{
+  "connector": {"id": "uuid"},
+  "operation": "charge.create",
+  "input": {"amount": 1000, "currency": "PLN"},
+  "options": {
+    "timeout_ms": 15000,
+    "dry_run": false,
+    "metadata": {"project_id": "..."}
+  }
+}
+```
+
+**Response 200**
+```json
+{
+  "status": "ok",
+  "output": {"upstream_id": "..."},
+  "upstream": {"http_status": 200},
+  "latency_ms": 123,
+  "attempts": 1,
+  "idempotency": {"key": "...", "replayed": false},
+  "request_id": "...",
+  "trace_id": "..."
+}
+```
+
+**Response 503 (circuit open)**
+```json
+{
+  "error": {"code": "CIRCUIT_OPEN", "message": "Connector temporarily disabled by circuit breaker"},
+  "request_id": "...",
+  "trace_id": "..."
+}
+```
+
+## `POST /jobs` (async enqueue)
+
+**Request**
+```json
+{
+  "type": "stripe.webhook.process",
+  "payload": {"inbox_id": "uuid"},
+  "run_at": null,
+  "idempotency_key": "optional"
+}
+```
+
+**Response 202**
+```json
+{
+  "job_id": "uuid",
+  "status": "queued",
+  "queued_at": "2026-01-03T00:00:00Z",
+  "request_id": "...",
+  "trace_id": "..."
+}
+```
+
+## `GET /jobs/:id`
+
+**Response 200**
+```json
+{
+  "job": {
+    "id": "uuid",
+    "tenant_id": "uuid",
+    "type": "stripe.webhook.process",
+    "status": "success",
+    "attempts": 1,
+    "max_attempts": 4,
+    "created_at": "...",
+    "updated_at": "..."
+  },
+  "runs": [
+    {"id": "uuid", "status": "success", "started_at": "...", "finished_at": "...", "error": null}
+  ]
+}
+```
+
+## `GET /events/stream` (SSE)
+- Content-Type: `text/event-stream`
+- Фильтры query: `tenant_id`, `connector_id`, `severity`, `type`, `trace_id`, `since`
+
+**SSE message (data)**
+```json
+{
+  "event_id": "uuid",
+  "ts": "2026-01-03T00:00:00Z",
+  "tenant_id": "uuid",
+  "severity": "info",
+  "type": "job_enqueued",
+  "message": "Job queued",
+  "correlation_id": "...",
+  "trace_id": "...",
+  "data": {"job_id": "uuid"}
+}
+```
+
+## `POST /webhooks/:provider`
+
+**Поведение:** всегда отвечать быстро (Stripe ждёт 2xx), тяжёлую работу — в очередь.
+
+- Verify signature (например `Stripe-Signature`)
+- Dedupe по `event_id`
+
+**Response 200**
+```json
+{
+  "received": true,
+  "inbox_id": "uuid",
+  "duplicate": false
+}
+```
+
+**Повторный webhook (dedupe)**
+- HTTP 200
+- `duplicate: true`
+- повторно job не enqueue
