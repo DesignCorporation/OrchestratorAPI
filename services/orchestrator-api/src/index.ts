@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import rawBody from 'fastify-raw-body';
+import type { FastifyPluginAsync } from 'fastify';
 import { Queue } from 'bullmq';
 import { Pool } from 'pg';
 import Redis from 'ioredis';
@@ -1921,12 +1922,12 @@ async function start() {
     }
   });
 
-  await app.register(rawBody, {
+  await app.register(rawBody as unknown as FastifyPluginAsync, {
     field: 'rawBody',
     global: false,
     encoding: false,
     runFirst: true
-  });
+  } as unknown as Record<string, unknown>);
   registerRoutes();
 
   app.setNotFoundHandler((request, reply) => {
@@ -1934,9 +1935,10 @@ async function start() {
   });
 
   app.setErrorHandler((error, request, reply) => {
-    const status = typeof (error as { statusCode?: number }).statusCode === 'number' ? (error as { statusCode?: number }).statusCode : 500;
+    const statusValue = (error as { statusCode?: number }).statusCode;
+    const status = typeof statusValue === 'number' ? statusValue : 500;
     const code = status === 500 ? 'internal_error' : 'request_error';
-    const message = status === 500 ? 'internal_error' : error.message;
+    const message = status === 500 ? 'internal_error' : (error instanceof Error ? error.message : 'request_error');
     app.log.error({ error }, 'request_error');
     if (!reply.sent) {
       return sendError(
@@ -1945,7 +1947,7 @@ async function start() {
         status,
         code,
         message,
-        status === 500 ? undefined : { message: error.message }
+        status === 500 ? undefined : { message: error instanceof Error ? error.message : 'request_error' }
       );
     }
   });

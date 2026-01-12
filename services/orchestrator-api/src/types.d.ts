@@ -8,6 +8,8 @@ declare module 'fastify' {
       scopes?: string[];
       tid?: string;
       role?: string;
+      impersonatedSub?: string;
+      impersonatedTid?: string;
     };
   }
 }
