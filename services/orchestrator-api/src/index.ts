@@ -798,8 +798,10 @@ function registerRoutes() {
       typeof retryJson.max_attempts === 'number' ? retryJson.max_attempts : Number(process.env.DEFAULT_MAX_ATTEMPTS || 4);
     const baseBackoffMs = typeof retryJson.base_ms === 'number' ? retryJson.base_ms : 250;
     const maxBackoffMs = typeof retryJson.max_ms === 'number' ? retryJson.max_ms : 5000;
-    const timeoutMs =
-      typeof timeoutJson.total_ms === 'number' ? timeoutJson.total_ms : 15000;
+    const timeoutCandidate = typeof timeoutJson.total_ms === 'number'
+      ? timeoutJson.total_ms
+      : Number(timeoutJson.total_ms);
+    const timeoutMs = Number.isFinite(timeoutCandidate) && timeoutCandidate > 0 ? timeoutCandidate : 15000;
 
     const rateLimit = await checkRateLimit(tenantId, connector.id, policySettings);
     if (!rateLimit.allowed) {
