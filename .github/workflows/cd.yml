@@ -54,6 +54,7 @@ jobs:
             fi
             sleep 2
           done
+          docker compose -f infra/docker-compose/docker-compose.dev.yml --profile migrations run --rm orchestrator-migrate
 
       - name: Contract tests
         run: pnpm -C services/orchestrator-api test:contract

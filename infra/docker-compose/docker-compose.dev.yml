@@ -113,6 +113,20 @@ services:
     ports:
       - "4102:4102"
 
+  orchestrator-migrate:
+    image: postgres:16-alpine
+    command: ["/bin/sh", "-c", "for file in /migrations/*.sql; do psql \"$DATABASE_URL\" -f \"$$file\"; done"]
+    environment:
+      DATABASE_URL: postgres://orchestrator:orchestrator@postgres:5432/orchestrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+    volumes:
+      - ../migrations:/migrations:ro
+    profiles: ["migrations"]
+
 networks:
   internal:
     driver: bridge
