@@ -21,7 +21,7 @@ jobs:
           run_install: false
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --config.optional=true
 
       - name: Lint
         run: pnpm lint
