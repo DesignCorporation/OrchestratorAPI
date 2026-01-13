@@ -174,6 +174,22 @@ test('contract: execute/jobs/webhooks', async () => {
   const jobGet = await request('GET', `/jobs/${jobId}`);
   assert.equal(jobGet.status, 200);
 
+  const workspaceRes = await request('POST', '/workspaces', {
+    name: `contract-ws-${Date.now()}`,
+    env: 'dev',
+    reason: 'contract test'
+  });
+  assert.equal(workspaceRes.status, 201);
+  const workspaceId = (workspaceRes.json as { id: string }).id;
+
+  const routeRes = await request('POST', '/webhook-routes', {
+    provider: 'stripe',
+    account_id: 'default',
+    tenant_id: workspaceId,
+    reason: 'contract test'
+  });
+  assert.equal(routeRes.status, 201);
+
   const payload = JSON.stringify({ id: 'evt_contract_1', type: 'payment_intent.succeeded' });
   const signature = stripe.webhooks.generateTestHeaderString({
     payload,
