@@ -1842,7 +1842,7 @@ function registerRoutes() {
           diff: { name },
           reason: body.reason
         });
-      } catch (error) {
+      } catch {
         report.skipped.policies += 1;
         addError('policy', i, 'policy_insert_failed', 'policy_insert_failed');
       }
