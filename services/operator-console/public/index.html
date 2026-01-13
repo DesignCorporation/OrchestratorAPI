@@ -493,6 +493,7 @@
           <button id="flow-load-active" class="secondary">Load active</button>
         </div>
         <div class="muted" id="flow-message">No changes yet.</div>
+        <div class="muted" id="flow-diff"></div>
         <div class="canvas" id="canvas">
           <svg class="edges" id="edges"></svg>
         </div>
@@ -866,6 +867,7 @@
       let activeVersion = null;
       let currentWorkspaceId = null;
       let lastSavedAt = null;
+      let lastDiff = '';
 
       function escapeHtml(value) {
         return String(value ?? '')
@@ -916,6 +918,7 @@
         selectNode(node);
         renderEdges();
         updateFlowJson();
+        updateDiffLabel();
       }
 
       function selectNode(node) {
@@ -939,6 +942,7 @@
         activeNode.querySelector('.node-title').textContent = nodeTitle.value;
         activeNode.querySelector('.node-meta').textContent = nodeEndpoint.value || 'no endpoint';
         renderEdges();
+        updateDiffLabel();
       }
 
       [nodeTitle, nodeType, nodeEndpoint, nodeNotes].forEach((el) =>
@@ -977,6 +981,7 @@
         pendingConnection = null;
         renderEdges();
         updateFlowJson();
+        updateDiffLabel();
       }
 
       function renderEdges() {
@@ -1035,6 +1040,7 @@
         inspectEmpty.style.display = 'block';
         showPanel('panel-overview');
         updateFlowJson();
+        updateDiffLabel();
       });
 
       function getFlowConfig() {
@@ -1098,6 +1104,7 @@
         document.getElementById('flow-active').textContent = activeVersion ? `Active: v${activeVersion}` : 'Active: —';
         const savedInfo = lastSavedAt && lastSavedVersion ? `Last saved v${lastSavedVersion} at ${lastSavedAt}` : 'Not saved yet.';
         document.getElementById('flow-message').textContent = savedInfo;
+        document.getElementById('flow-diff').textContent = lastDiff || '';
       }
 
       document.getElementById('flow-save').addEventListener('click', async () => {
@@ -1117,6 +1124,7 @@
           lastSavedConfigId = res.id;
           lastSavedAt = new Date().toLocaleTimeString();
           updateFlowJson();
+          updateDiffLabel();
           logStatus('flow saved', res);
         } catch (error) {
           logStatus('flow save error', { error: error.message });
@@ -1156,6 +1164,7 @@
           activeVersion = res.active.version;
           lastSavedAt = new Date().toLocaleTimeString();
           loadFlowConfig(res.active.config_json || {});
+          updateDiffLabel();
         } catch (error) {
           logStatus('flow load active error', { error: error.message });
         }
@@ -1187,6 +1196,7 @@
           lastSavedJson = JSON.stringify(previous.config_json || {}, null, 2);
           lastSavedAt = new Date().toLocaleTimeString();
           loadFlowConfig(previous.config_json || {});
+          updateDiffLabel();
           logStatus('flow rollback', act);
         } catch (error) {
           logStatus('flow rollback error', { error: error.message });
@@ -1194,6 +1204,7 @@
       });
 
       updateFlowJson();
+      updateDiffLabel();
 
       function addEvent(data) {
         const li = document.createElement('li');
@@ -1266,6 +1277,42 @@
                 )
                 .join('');
         container.innerHTML = `<div class="table-wrap"><table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table></div>`;
+      }
+
+      function diffKeys(prev, next, base = '') {
+        const changes = [];
+        const keys = new Set([...Object.keys(prev || {}), ...Object.keys(next || {})]);
+        keys.forEach((key) => {
+          const path = base ? `${base}.${key}` : key;
+          const a = prev ? prev[key] : undefined;
+          const b = next ? next[key] : undefined;
+          const bothObjects = a && b && typeof a === 'object' && typeof b === 'object';
+          if (bothObjects && !Array.isArray(a) && !Array.isArray(b)) {
+            changes.push(...diffKeys(a, b, path));
+            return;
+          }
+          if (JSON.stringify(a) !== JSON.stringify(b)) {
+            changes.push(path);
+          }
+        });
+        return changes;
+      }
+
+      function updateDiffLabel() {
+        if (!lastSavedJson) {
+          lastDiff = '';
+          updateFlowJson();
+          return;
+        }
+        try {
+          const saved = JSON.parse(lastSavedJson);
+          const current = getFlowConfig();
+          const diff = diffKeys(saved, current);
+          lastDiff = diff.length ? `Changed: ${diff.slice(0, 6).join(', ')}${diff.length > 6 ? '…' : ''}` : 'No changes.';
+        } catch {
+          lastDiff = '';
+        }
+        updateFlowJson();
       }
 
       function confirmAction({ title, message, confirmLabel = 'Confirm' }) {
@@ -1688,6 +1735,7 @@
           activeVersion = res.active.version;
           lastSavedAt = new Date().toLocaleTimeString();
           loadFlowConfig(res.active.config_json || {});
+          updateDiffLabel();
         } catch (error) {
           if (String(error.message || '').includes('config_not_active')) {
             lastSavedJson = '';
@@ -1696,6 +1744,7 @@
             activeVersion = null;
             lastSavedAt = null;
             updateFlowJson();
+            updateDiffLabel();
             return;
           }
           logStatus('flow auto-load error', { error: error.message });
