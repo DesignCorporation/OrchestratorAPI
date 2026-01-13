@@ -42,6 +42,14 @@
 - unique `(tenant_id, provider, event_id)`
 - индексы: `(tenant_id, received_at)`
 
+## WebhookRoute
+- `id`, `provider (text)`, `account_id (text)`
+- `tenant_id (uuid)` → Workspace
+- `connector_id (uuid, nullable)` → Connector
+- `created_at`, `updated_at`
+- unique `(provider, account_id)`
+- индексы: `(tenant_id)`
+
 ## Job
 - `id`, `tenant_id`, `type (text)`
 - `status (text)` (queued|running|success|failed|dead)

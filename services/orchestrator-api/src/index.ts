@@ -732,7 +732,55 @@ function registerRoutes() {
     );
   }
 
-  const dedupeKey = `webhook:stripe:${event.id}`;
+  const headerAccount =
+    (typeof request.headers['stripe-account'] === 'string' ? request.headers['stripe-account'] : null) ||
+    (typeof request.headers['x-provider-account-id'] === 'string' ? request.headers['x-provider-account-id'] : null);
+  const eventAccount =
+    typeof (event as Stripe.Event & { account?: string }).account === 'string'
+      ? (event as Stripe.Event & { account?: string }).account
+      : null;
+  const accountId = (eventAccount || headerAccount || 'default').trim();
+
+  const routeRes = await pgPool.query(
+    `SELECT wr.tenant_id, wr.connector_id, w.status
+     FROM webhook_route wr
+     JOIN workspace w ON w.id = wr.tenant_id
+     WHERE wr.provider = $1 AND wr.account_id = $2`,
+    ['stripe', accountId]
+  );
+  if ((routeRes.rowCount ?? 0) === 0) {
+    await logEvent({
+      tenantId: defaultTenantId,
+      severity: 'warn',
+      type: 'webhook_misroute',
+      message: 'Webhook route not found',
+      data: { provider: 'stripe', account_id: accountId, event_id: event.id },
+      correlationId: requestId,
+      traceId
+    });
+    return sendError(
+      reply,
+      request as { headers: Record<string, unknown> },
+      404,
+      'webhook_route_not_found',
+      'webhook_route_not_found'
+    );
+  }
+
+  if (routeRes.rows[0].status === 'disabled') {
+    return sendError(
+      reply,
+      request as { headers: Record<string, unknown> },
+      409,
+      'workspace_disabled',
+      'workspace_disabled'
+    );
+  }
+
+  const routedTenantId = routeRes.rows[0].tenant_id as string;
+  const routedConnectorId = routeRes.rows[0].connector_id as string | null;
+
+  const dedupeKey = `webhook:stripe:${routedTenantId}:${event.id}`;
   const setResult = await (redis as unknown as { set: (...args: unknown[]) => Promise<string | null> }).set(
     dedupeKey,
     '1',
@@ -747,41 +795,54 @@ function registerRoutes() {
   const inboxId = randomUUID();
   const jobId = randomUUID();
   const { payloadJson: webhookPayloadBase, payloadRef: webhookPayloadRef } = await maybeStorePayload(event, {
-    tenantId: defaultTenantId,
+    tenantId: routedTenantId,
     kind: 'webhook/stripe'
   });
-  const webhookPayload = { ...webhookPayloadBase, type: event.type, event_id: event.id };
+  const webhookPayload = {
+    ...webhookPayloadBase,
+    type: event.type,
+    event_id: event.id,
+    account_id: accountId
+  };
 
   await pgPool.query(
     `INSERT INTO webhook_inbox (id, tenant_id, provider, event_id, signature_valid, status, payload_ref, payload_json)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT DO NOTHING`,
-    [inboxId, defaultTenantId, 'stripe', event.id, true, 'received', webhookPayloadRef, webhookPayload]
+    [inboxId, routedTenantId, 'stripe', event.id, true, 'received', webhookPayloadRef, webhookPayload]
   );
 
   await pgPool.query(
     `INSERT INTO job (id, tenant_id, type, status, attempts, max_attempts, payload_json)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [jobId, defaultTenantId, 'stripe.webhook', 'queued', 0, 4, { inboxId, eventId: event.id }]
+    [
+      jobId,
+      routedTenantId,
+      'stripe.webhook',
+      'queued',
+      0,
+      4,
+      { inboxId, eventId: event.id, accountId, connectorId: routedConnectorId }
+    ]
   );
 
   await webhookQueue.add(
     'stripe.webhook',
-    { jobId, inboxId, eventId: event.id, correlationId: requestId, traceId },
+    { jobId, inboxId, eventId: event.id, accountId, connectorId: routedConnectorId, correlationId: requestId, traceId },
     { jobId, removeOnComplete: true }
   );
 
   await logEvent({
-    tenantId: defaultTenantId,
+    tenantId: routedTenantId,
     severity: 'info',
     type: 'webhook_received',
     message: 'Stripe webhook received',
-    data: { inbox_id: inboxId, event_id: event.id, event_type: event.type },
+    data: { inbox_id: inboxId, event_id: event.id, event_type: event.type, account_id: accountId },
     correlationId: requestId,
     traceId
   });
   await logEvent({
-    tenantId: defaultTenantId,
+    tenantId: routedTenantId,
     severity: 'info',
     type: 'job_enqueued',
     message: 'Webhook job enqueued',
@@ -790,7 +851,7 @@ function registerRoutes() {
     traceId
   });
   await logRequest({
-    tenantId: defaultTenantId,
+    tenantId: routedTenantId,
     requestId,
     traceId,
     actorType: 'webhook',
@@ -1735,6 +1796,288 @@ function registerRoutes() {
       return sendError(reply, request as { headers: Record<string, unknown> }, 404, 'config_not_active', 'config_not_active');
     }
     return reply.status(200).send({ active: result.rows[0] });
+  });
+
+  app.post('/webhook-routes', async (request, reply) => {
+    if (!requireScope(request, 'orchestrator.control.write')) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 403, 'forbidden', 'forbidden');
+    }
+    if (!pgPool) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 500, 'db_not_configured', 'db_not_configured');
+    }
+
+    const body = request.body as {
+      provider?: string;
+      account_id?: string;
+      tenant_id?: string;
+      connector_id?: string | null;
+      reason?: string;
+    };
+    if (!body?.provider || !body?.account_id || !body?.tenant_id || !body?.reason) {
+      return sendError(
+        reply,
+        request as { headers: Record<string, unknown> },
+        400,
+        'missing_provider_or_account',
+        'missing_provider_or_account'
+      );
+    }
+    if (!isUuid(body.tenant_id)) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 400, 'invalid_tenant_id', 'invalid_tenant_id');
+    }
+    if (body.connector_id && !isUuid(body.connector_id)) {
+      return sendError(
+        reply,
+        request as { headers: Record<string, unknown> },
+        400,
+        'invalid_connector_id',
+        'invalid_connector_id'
+      );
+    }
+
+    const workspaceRes = await pgPool.query('SELECT id FROM workspace WHERE id = $1', [body.tenant_id]);
+    if ((workspaceRes.rowCount ?? 0) === 0) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 404, 'workspace_not_found', 'workspace_not_found');
+    }
+    if (body.connector_id) {
+      const connectorRes = await pgPool.query('SELECT id FROM connector WHERE id = $1 AND tenant_id = $2', [
+        body.connector_id,
+        body.tenant_id
+      ]);
+      if ((connectorRes.rowCount ?? 0) === 0) {
+        return sendError(reply, request as { headers: Record<string, unknown> }, 404, 'connector_not_found', 'connector_not_found');
+      }
+    }
+
+    const routeId = randomUUID();
+    try {
+      await pgPool.query(
+        `INSERT INTO webhook_route (id, provider, account_id, tenant_id, connector_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [routeId, body.provider, body.account_id, body.tenant_id, body.connector_id || null]
+      );
+    } catch (error) {
+      if ((error as { code?: string })?.code === '23505') {
+        return sendError(
+          reply,
+          request as { headers: Record<string, unknown> },
+          409,
+          'webhook_route_exists',
+          'webhook_route_exists'
+        );
+      }
+      throw error;
+    }
+
+    const operatorId = request.user?.sub && isUuid(request.user.sub) ? request.user.sub : defaultTenantId;
+    await logAudit({
+      operatorId,
+      action: 'webhook_route.create',
+      resourceType: 'webhook_route',
+      resourceId: routeId,
+      diff: {
+        provider: body.provider,
+        account_id: body.account_id,
+        tenant_id: body.tenant_id,
+        connector_id: body.connector_id || null
+      },
+      reason: body.reason
+    });
+
+    return reply.status(201).send({ id: routeId });
+  });
+
+  app.get('/webhook-routes', async (request, reply) => {
+    if (!requireScope(request, 'orchestrator.control.read')) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 403, 'forbidden', 'forbidden');
+    }
+    if (!pgPool) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 500, 'db_not_configured', 'db_not_configured');
+    }
+
+    const query = request.query as { provider?: string; account_id?: string; tenant_id?: string };
+    const params: Array<string> = [];
+    let where = '1=1';
+    if (query.provider) {
+      params.push(query.provider);
+      where += ` AND provider = $${params.length}`;
+    }
+    if (query.account_id) {
+      params.push(query.account_id);
+      where += ` AND account_id = $${params.length}`;
+    }
+    if (query.tenant_id) {
+      params.push(query.tenant_id);
+      where += ` AND tenant_id = $${params.length}`;
+    }
+
+    const result = await pgPool.query(`SELECT * FROM webhook_route WHERE ${where} ORDER BY created_at DESC`, params);
+    return reply.status(200).send({ routes: result.rows });
+  });
+
+  app.patch('/webhook-routes/:id', async (request, reply) => {
+    if (!requireScope(request, 'orchestrator.control.write')) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 403, 'forbidden', 'forbidden');
+    }
+    if (!pgPool) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 500, 'db_not_configured', 'db_not_configured');
+    }
+
+    const { id } = request.params as { id: string };
+    if (!isUuid(id)) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 400, 'invalid_route_id', 'invalid_route_id');
+    }
+    const body = request.body as {
+      provider?: string;
+      account_id?: string;
+      tenant_id?: string;
+      connector_id?: string | null;
+      reason?: string;
+    };
+    if (!body?.reason) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 400, 'missing_reason', 'missing_reason');
+    }
+
+    const updates: string[] = [];
+    const values: Array<string | null> = [];
+    if (body.provider) {
+      values.push(body.provider);
+      updates.push(`provider = $${values.length}`);
+    }
+    if (body.account_id) {
+      values.push(body.account_id);
+      updates.push(`account_id = $${values.length}`);
+    }
+    if (body.tenant_id) {
+      if (!isUuid(body.tenant_id)) {
+        return sendError(reply, request as { headers: Record<string, unknown> }, 400, 'invalid_tenant_id', 'invalid_tenant_id');
+      }
+      values.push(body.tenant_id);
+      updates.push(`tenant_id = $${values.length}`);
+    }
+    if (body.connector_id !== undefined) {
+      if (body.connector_id && !isUuid(body.connector_id)) {
+        return sendError(
+          reply,
+          request as { headers: Record<string, unknown> },
+          400,
+          'invalid_connector_id',
+          'invalid_connector_id'
+        );
+      }
+      values.push(body.connector_id || null);
+      updates.push(`connector_id = $${values.length}`);
+    }
+    if (updates.length === 0) {
+      return sendError(
+        reply,
+        request as { headers: Record<string, unknown> },
+        400,
+        'missing_update_fields',
+        'missing_update_fields'
+      );
+    }
+
+    if (body.tenant_id) {
+      const workspaceRes = await pgPool.query('SELECT id FROM workspace WHERE id = $1', [body.tenant_id]);
+      if ((workspaceRes.rowCount ?? 0) === 0) {
+        return sendError(reply, request as { headers: Record<string, unknown> }, 404, 'workspace_not_found', 'workspace_not_found');
+      }
+    }
+    if (body.connector_id && body.tenant_id) {
+      const connectorRes = await pgPool.query('SELECT id FROM connector WHERE id = $1 AND tenant_id = $2', [
+        body.connector_id,
+        body.tenant_id
+      ]);
+      if ((connectorRes.rowCount ?? 0) === 0) {
+        return sendError(reply, request as { headers: Record<string, unknown> }, 404, 'connector_not_found', 'connector_not_found');
+      }
+    }
+
+    values.push(id);
+    try {
+      const result = await pgPool.query(
+        `UPDATE webhook_route SET ${updates.join(', ')}, updated_at = now() WHERE id = $${values.length} RETURNING *`,
+        values
+      );
+      if ((result.rowCount ?? 0) === 0) {
+        return sendError(
+          reply,
+          request as { headers: Record<string, unknown> },
+          404,
+          'webhook_route_not_found',
+          'webhook_route_not_found'
+        );
+      }
+    } catch (error) {
+      if ((error as { code?: string })?.code === '23505') {
+        return sendError(
+          reply,
+          request as { headers: Record<string, unknown> },
+          409,
+          'webhook_route_exists',
+          'webhook_route_exists'
+        );
+      }
+      throw error;
+    }
+
+    const operatorId = request.user?.sub && isUuid(request.user.sub) ? request.user.sub : defaultTenantId;
+    await logAudit({
+      operatorId,
+      action: 'webhook_route.update',
+      resourceType: 'webhook_route',
+      resourceId: id,
+      diff: body,
+      reason: body.reason
+    });
+
+    return reply.status(200).send({ status: 'ok' });
+  });
+
+  app.delete('/webhook-routes/:id', async (request, reply) => {
+    if (!requireScope(request, 'orchestrator.control.write')) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 403, 'forbidden', 'forbidden');
+    }
+    if (!pgPool) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 500, 'db_not_configured', 'db_not_configured');
+    }
+
+    const { id } = request.params as { id: string };
+    if (!isUuid(id)) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 400, 'invalid_route_id', 'invalid_route_id');
+    }
+    const body = request.body as { reason?: string } | undefined;
+    const query = request.query as { reason?: string };
+    const reason = body?.reason || query?.reason;
+    if (!reason) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 400, 'missing_reason', 'missing_reason');
+    }
+
+    const result = await pgPool.query('DELETE FROM webhook_route WHERE id = $1 RETURNING provider, account_id, tenant_id', [
+      id
+    ]);
+    if ((result.rowCount ?? 0) === 0) {
+      return sendError(
+        reply,
+        request as { headers: Record<string, unknown> },
+        404,
+        'webhook_route_not_found',
+        'webhook_route_not_found'
+      );
+    }
+
+    const operatorId = request.user?.sub && isUuid(request.user.sub) ? request.user.sub : defaultTenantId;
+    await logAudit({
+      operatorId,
+      action: 'webhook_route.delete',
+      resourceType: 'webhook_route',
+      resourceId: id,
+      diff: result.rows[0],
+      reason
+    });
+
+    return reply.status(200).send({ status: 'deleted' });
   });
 
   app.get('/bundle/export', async (request, reply) => {

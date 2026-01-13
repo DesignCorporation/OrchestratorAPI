@@ -43,6 +43,7 @@ All error responses use the same JSON shape:
 - `missing_type_or_name`
 - `missing_provider_ref_or_reason`
 - `missing_provider_or_ref`
+- `missing_provider_or_account`
 - `missing_name_or_reason`
 - `missing_name_or_env`
 - `invalid_env`
@@ -62,6 +63,12 @@ All error responses use the same JSON shape:
 - `missing_reason`
 - `invalid_impersonate_sub`
 - `invalid_impersonate_tenant`
+- `invalid_tenant_id`
+- `invalid_connector_id`
+- `invalid_route_id`
+- `missing_update_fields`
+- `webhook_route_exists`
+- `webhook_route_not_found`
 - `bundle_invalid_payload`
 - `missing_config_json`
 - `missing_name_or_config_id`

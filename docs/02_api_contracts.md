@@ -267,3 +267,78 @@
 - HTTP 200
 - `duplicate: true`
 - повторно job не enqueue
+
+## `POST /webhook-routes` (control)
+
+**Назначение:** создать webhook route (provider + account_id → workspace).
+
+**Request**
+```json
+{
+  "provider": "stripe",
+  "account_id": "acct_123",
+  "tenant_id": "uuid",
+  "connector_id": "uuid",
+  "reason": "onboarding"
+}
+```
+
+**Response**
+```json
+{
+  "id": "uuid"
+}
+```
+
+## `GET /webhook-routes` (control)
+
+**Query params:** `provider`, `account_id`, `tenant_id`.
+
+**Response**
+```json
+{
+  "routes": [
+    {
+      "id": "uuid",
+      "provider": "stripe",
+      "account_id": "acct_123",
+      "tenant_id": "uuid",
+      "connector_id": "uuid"
+    }
+  ]
+}
+```
+
+## `PATCH /webhook-routes/:id` (control)
+
+**Request**
+```json
+{
+  "tenant_id": "uuid",
+  "connector_id": "uuid",
+  "reason": "change target"
+}
+```
+
+**Response**
+```json
+{
+  "status": "ok"
+}
+```
+
+## `DELETE /webhook-routes/:id` (control)
+
+**Request**
+```json
+{
+  "reason": "cleanup"
+}
+```
+
+**Response**
+```json
+{
+  "status": "deleted"
+}
+```
