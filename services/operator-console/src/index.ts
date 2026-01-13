@@ -1,20 +1,14 @@
 import Fastify from 'fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import fastifyStatic from '@fastify/static';
 import path from 'path';
 import fs from 'fs';
 
 const app = Fastify({ logger: true });
 
-app.register(fastifyStatic, {
-  root: path.join(__dirname, '..', 'public'),
-  prefix: '/',
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) {
-      res.setHeader('cache-control', 'no-store');
-    }
-  }
-});
+const indexHtmlPath = path.join(__dirname, '..', 'public', 'index.html');
+function readIndexHtml() {
+  return fs.readFileSync(indexHtmlPath, 'utf8');
+}
 
 const controlPlaneUrl = process.env.CONTROL_PLANE_URL || 'http://orchestrator-control:4000';
 const execPlaneUrl = process.env.EXEC_PLANE_URL || '';
@@ -30,6 +24,12 @@ if (!serviceToken && serviceTokenFile) {
 
 app.get('/health', async () => {
   return { status: 'ok' };
+});
+
+app.get('/', async (_request, reply) => {
+  reply.header('cache-control', 'no-store');
+  reply.type('text/html; charset=utf-8');
+  return reply.send(readIndexHtml());
 });
 
 app.get('/api/events', async (request, reply) => {
@@ -117,6 +117,14 @@ app.post('/api/configs', async (request, reply) => {
 app.post('/api/configs/activate', async (request, reply) => {
   const url = new URL('/configs/activate', controlPlaneUrl);
   return proxyJson(request, reply, url, 'POST');
+});
+
+app.get('/api/configs', async (request, reply) => {
+  const url = new URL('/configs', controlPlaneUrl);
+  for (const [key, value] of Object.entries(request.query as Record<string, string>)) {
+    url.searchParams.set(key, value);
+  }
+  return proxyJson(request, reply, url);
 });
 
 app.get('/api/configs/active', async (request, reply) => {
@@ -259,7 +267,9 @@ app.get('/api/events/stream', async (request, reply) => {
 });
 
 app.setNotFoundHandler((request, reply) => {
-  reply.sendFile('index.html');
+  reply.header('cache-control', 'no-store');
+  reply.type('text/html; charset=utf-8');
+  reply.send(readIndexHtml());
 });
 
 async function start() {

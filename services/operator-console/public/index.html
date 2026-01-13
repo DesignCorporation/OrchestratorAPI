@@ -112,6 +112,12 @@
         gap: 12px;
       }
 
+      .topbar-controls {
+        display: flex;
+        align-items: stretch;
+        gap: 10px;
+      }
+
       .topbar h1 {
         margin: 0;
         font-size: 20px;
@@ -477,9 +483,15 @@
             <h1>Workspace Flow</h1>
             <p>Drag & connect blocks. Click a block to edit.</p>
           </div>
-          <div class="workspace-switch">
-            <label>Workspace</label>
-            <select id="workspace-select"></select>
+          <div class="topbar-controls">
+            <div class="workspace-switch">
+              <label>Workspace</label>
+              <select id="workspace-select"></select>
+            </div>
+            <div class="workspace-switch">
+              <label>Version</label>
+              <select id="flow-version-select"></select>
+            </div>
           </div>
         </div>
         <div class="toolbar">
@@ -608,7 +620,7 @@
         </div>
 
         <div id="panel-configs" class="panel active">
-          <h4>Configs & Versions</h4>
+          <h4>Config JSON (advanced)</h4>
           <div class="field">
             <label>Config name</label>
             <input id="cfg-name" value="demo-config" />
@@ -621,12 +633,7 @@
           <textarea id="cfg-json">{\n  "version": 1,\n  "feature_flags": {"demo": true}\n}</textarea>
           <div class="toolbar">
             <button id="cfg-create">Create config</button>
-            <button id="cfg-load" class="secondary">Load history</button>
-            <button id="cfg-active" class="secondary">Show active</button>
-            <button id="cfg-rollback" class="secondary">Rollback</button>
           </div>
-          <div class="list" id="cfg-list"></div>
-          <div class="list" id="cfg-active-view"></div>
           <div class="field">
             <label>Saved JSON</label>
             <textarea id="flow-saved" readonly></textarea>
@@ -634,10 +641,6 @@
           <div class="field">
             <label>Current JSON</label>
             <textarea id="flow-current" readonly></textarea>
-          </div>
-          <div class="field">
-            <label>Versions</label>
-            <div class="list" id="flow-versions"></div>
           </div>
         </div>
 
@@ -808,7 +811,7 @@
       const cfgRollback = document.getElementById('cfg-rollback');
       const cfgList = document.getElementById('cfg-list');
       const cfgActiveView = document.getElementById('cfg-active-view');
-      const flowVersions = document.getElementById('flow-versions');
+      const flowVersionSelect = document.getElementById('flow-version-select');
       const policyName = document.getElementById('policy-name');
       const policyReason = document.getElementById('policy-reason');
       const policyJson = document.getElementById('policy-json');
@@ -873,6 +876,7 @@
       let lastSavedVersion = null;
       let lastSavedConfigId = null;
       let activeVersion = null;
+      let flowConfigsCache = [];
       let currentWorkspaceId = null;
       let lastSavedAt = null;
       let lastDiff = '';
@@ -1462,7 +1466,7 @@
         }
       });
 
-      cfgLoad.addEventListener('click', async () => {
+      if (cfgLoad) cfgLoad.addEventListener('click', async () => {
         try {
           const [res, active] = await Promise.all([
             callApi(`/api/configs?name=${encodeURIComponent(cfgName.value)}`),
@@ -1507,7 +1511,7 @@
         }
       });
 
-      cfgActive.addEventListener('click', async () => {
+      if (cfgActive) cfgActive.addEventListener('click', async () => {
         try {
           const res = await callApi(`/api/configs/active?name=${encodeURIComponent(cfgName.value)}`);
           renderList(cfgActiveView, [res.active], (item) => {
@@ -1518,7 +1522,7 @@
         }
       });
 
-      cfgRollback.addEventListener('click', async () => {
+      if (cfgRollback) cfgRollback.addEventListener('click', async () => {
         try {
           const [res, active] = await Promise.all([
             callApi(`/api/configs?name=${encodeURIComponent(cfgName.value)}`),
@@ -1764,6 +1768,18 @@
         loadActiveFlow();
       });
 
+      flowVersionSelect.addEventListener('change', () => {
+        const id = flowVersionSelect.value;
+        const config = flowConfigsCache.find((cfg) => cfg.id === id);
+        if (!config) return;
+        lastSavedJson = JSON.stringify(config.config_json || {}, null, 2);
+        lastSavedVersion = config.version;
+        lastSavedConfigId = config.id;
+        lastSavedAt = new Date().toLocaleTimeString();
+        loadFlowConfig(config.config_json || {});
+        updateDiffLabel();
+      });
+
       async function loadActiveFlow() {
         try {
           const flowName = document.getElementById('flow-name').value || 'flow';
@@ -1785,6 +1801,7 @@
             lastSavedAt = null;
             updateFlowJson();
             updateDiffLabel();
+            await loadFlowVersions();
             return;
           }
           logStatus('flow auto-load error', { error: error.message });
@@ -1798,47 +1815,31 @@
           const configs = (res.configs || []).slice().sort((a, b) => b.version - a.version);
           const activeRes = await callApi(`/api/configs/active?name=${encodeURIComponent(flowName)}`).catch(() => ({ active: null }));
           const activeId = activeRes.active?.config_id || null;
-          renderList(flowVersions, configs, (cfg) => {
-            const isActive = cfg.id === activeId;
-            const badge = isActive ? '<span class="badge success">active</span>' : '<span class="badge">draft</span>';
-            return `<div><strong>v${cfg.version}</strong> ${badge} <span class="muted">${cfg.created_at}</span>
-              <div class="toolbar">
-                <button data-action="load" data-id="${cfg.id}" class="secondary">Load</button>
-                <button data-action="activate" data-id="${cfg.id}">Activate</button>
-              </div>
-            </div>`;
-          });
-          flowVersions.querySelectorAll('button').forEach((btn) => {
-            btn.addEventListener('click', async () => {
-              const id = btn.getAttribute('data-id');
-              const action = btn.getAttribute('data-action');
-              if (!id || !action) return;
-              if (action === 'load') {
-                const config = configs.find((c) => c.id === id);
-                if (!config) return;
-                lastSavedJson = JSON.stringify(config.config_json || {}, null, 2);
-                lastSavedVersion = config.version;
-                lastSavedConfigId = config.id;
-                lastSavedAt = new Date().toLocaleTimeString();
-                loadFlowConfig(config.config_json || {});
-                updateDiffLabel();
-                return;
+          flowConfigsCache = configs;
+          if (flowVersionSelect) {
+            flowVersionSelect.innerHTML = '';
+            if (!configs.length) {
+              const option = document.createElement('option');
+              option.value = '';
+              option.textContent = 'No versions';
+              flowVersionSelect.appendChild(option);
+              flowVersionSelect.disabled = true;
+            } else {
+              flowVersionSelect.disabled = false;
+              configs.forEach((cfg) => {
+                const option = document.createElement('option');
+                option.value = cfg.id;
+                option.textContent = `v${cfg.version}${cfg.id === activeId ? ' • active' : ''}`;
+                flowVersionSelect.appendChild(option);
+              });
+              const preferredId = lastSavedConfigId && configs.find((cfg) => cfg.id === lastSavedConfigId)
+                ? lastSavedConfigId
+                : (activeId || configs[0].id);
+              if (preferredId) {
+                flowVersionSelect.value = preferredId;
               }
-              if (action === 'activate') {
-                await callApi('/api/configs/activate', {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    name: flowName,
-                    config_id: id,
-                    reason: 'flow activate'
-                  })
-                });
-                activeVersion = configs.find((c) => c.id === id)?.version || null;
-                updateFlowJson();
-                await loadFlowVersions();
-              }
-            });
-          });
+            }
+          }
         } catch (error) {
           logStatus('flow versions error', { error: error.message });
         }
