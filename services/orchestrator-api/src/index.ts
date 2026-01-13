@@ -1409,6 +1409,44 @@ function registerRoutes() {
     return reply.status(200).send({ queues: results });
   });
 
+  app.get('/admin/webhook-inbox', async (request, reply) => {
+    if (!requireScope(request, 'orchestrator.admin')) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 403, 'forbidden', 'forbidden');
+    }
+    if (!pgPool) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 500, 'db_not_configured', 'db_not_configured');
+    }
+
+    const tenantId = getTenantId(request);
+    const query = request.query as { provider?: string; status?: string; event_id?: string; limit?: string };
+    const limit = Math.min(Number(query.limit || 50), 200);
+    const params: Array<string | number> = [tenantId, limit];
+    let where = 'tenant_id = $1';
+    if (query.provider) {
+      params.push(query.provider);
+      where += ` AND provider = $${params.length}`;
+    }
+    if (query.status) {
+      params.push(query.status);
+      where += ` AND status = $${params.length}`;
+    }
+    if (query.event_id) {
+      params.push(query.event_id);
+      where += ` AND event_id = $${params.length}`;
+    }
+
+    const result = await pgPool.query(
+      `SELECT id, provider, event_id, status, signature_valid, received_at, processed_at, payload_ref, payload_json
+       FROM webhook_inbox
+       WHERE ${where}
+       ORDER BY received_at DESC
+       LIMIT $2`,
+      params
+    );
+
+    return reply.status(200).send({ inbox: result.rows });
+  });
+
   app.post('/admin/impersonation/issue', async (request, reply) => {
     if (!requireScope(request, 'orchestrator.admin')) {
       return sendError(reply, request as { headers: Record<string, unknown> }, 403, 'forbidden', 'forbidden');

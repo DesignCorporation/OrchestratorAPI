@@ -133,6 +133,29 @@ app.get('/api/audit-logs', async (request, reply) => {
   return proxyJson(request, reply, url);
 });
 
+app.get('/api/dlq', async (request, reply) => {
+  const url = new URL('/admin/dlq', controlPlaneUrl);
+  return proxyJson(request, reply, url);
+});
+
+app.post('/api/dlq/replay', async (request, reply) => {
+  const url = new URL('/admin/dlq/replay', controlPlaneUrl);
+  return proxyJson(request, reply, url, 'POST');
+});
+
+app.post('/api/dlq/purge', async (request, reply) => {
+  const url = new URL('/admin/dlq/purge', controlPlaneUrl);
+  return proxyJson(request, reply, url, 'POST');
+});
+
+app.get('/api/webhook-inbox', async (request, reply) => {
+  const url = new URL('/admin/webhook-inbox', controlPlaneUrl);
+  for (const [key, value] of Object.entries(request.query as Record<string, string>)) {
+    url.searchParams.set(key, value);
+  }
+  return proxyJson(request, reply, url);
+});
+
 app.get('/api/workspaces', async (request, reply) => {
   const url = new URL('/workspaces', controlPlaneUrl);
   for (const [key, value] of Object.entries(request.query as Record<string, string>)) {

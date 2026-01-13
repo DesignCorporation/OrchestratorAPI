@@ -337,12 +337,54 @@
           <p class="muted">SSE поток событий и фильтры.</p>
         </div>
         <div class="card">
-          <strong>Webhook Inbox</strong>
+          <h3 class="section-title">Webhook Inbox</h3>
           <p class="muted">Состояние входящих вебхуков.</p>
+          <div class="fields">
+            <div class="field">
+              <label>Limit</label>
+              <input id="inbox-limit" value="50" />
+            </div>
+            <div class="field">
+              <label>Provider</label>
+              <input id="inbox-provider" placeholder="stripe" />
+            </div>
+            <div class="field">
+              <label>Status</label>
+              <input id="inbox-status" placeholder="received" />
+            </div>
+            <div class="field">
+              <label>Event ID</label>
+              <input id="inbox-event" placeholder="evt_..." />
+            </div>
+          </div>
+          <div class="toolbar stack">
+            <button id="inbox-load">Load inbox</button>
+          </div>
+          <div class="list" id="inbox-list"></div>
         </div>
         <div class="card">
-          <strong>DLQ</strong>
+          <h3 class="section-title">DLQ</h3>
           <p class="muted">Replay, purge и аудит.</p>
+          <div class="fields">
+            <div class="field">
+              <label>Queue</label>
+              <input id="dlq-queue" value="default" />
+            </div>
+            <div class="field">
+              <label>Job ID</label>
+              <input id="dlq-job-id" placeholder="job id" />
+            </div>
+            <div class="field">
+              <label>Reason</label>
+              <input id="dlq-reason" placeholder="reason" />
+            </div>
+          </div>
+          <div class="toolbar stack">
+            <button id="dlq-load">Load DLQ</button>
+            <button id="dlq-replay">Replay job</button>
+            <button id="dlq-purge">Purge queue</button>
+          </div>
+          <div class="list" id="dlq-list"></div>
         </div>
         <div class="card">
           <strong>Control Plane</strong>
@@ -402,6 +444,19 @@
       const bundleJson = document.getElementById('bundle-json');
       const bundleExport = document.getElementById('bundle-export');
       const bundleImport = document.getElementById('bundle-import');
+      const inboxLimit = document.getElementById('inbox-limit');
+      const inboxProvider = document.getElementById('inbox-provider');
+      const inboxStatus = document.getElementById('inbox-status');
+      const inboxEvent = document.getElementById('inbox-event');
+      const inboxLoad = document.getElementById('inbox-load');
+      const inboxList = document.getElementById('inbox-list');
+      const dlqQueue = document.getElementById('dlq-queue');
+      const dlqJobId = document.getElementById('dlq-job-id');
+      const dlqReason = document.getElementById('dlq-reason');
+      const dlqLoad = document.getElementById('dlq-load');
+      const dlqReplay = document.getElementById('dlq-replay');
+      const dlqPurge = document.getElementById('dlq-purge');
+      const dlqList = document.getElementById('dlq-list');
       const state = { policyId: null, connectorId: null };
       let source = null;
 
@@ -781,6 +836,65 @@
           logStatus('bundle import ok', res);
         } catch (error) {
           logStatus('bundle import ошибка', { error: error.message });
+        }
+      });
+
+      inboxLoad.addEventListener('click', async () => {
+        try {
+          const params = new URLSearchParams();
+          if (inboxLimit.value) params.set('limit', inboxLimit.value);
+          if (inboxProvider.value) params.set('provider', inboxProvider.value);
+          if (inboxStatus.value) params.set('status', inboxStatus.value);
+          if (inboxEvent.value) params.set('event_id', inboxEvent.value);
+          const res = await callApi(`/api/webhook-inbox?${params.toString()}`);
+          renderList(inboxList, res.inbox || [], (row) => {
+            return `<div><strong>${row.provider}</strong> ${row.event_id} <span class="muted">${row.status}</span> <span class="muted">${row.received_at}</span></div>`;
+          });
+        } catch (error) {
+          logStatus('webhook inbox ошибка', { error: error.message });
+        }
+      });
+
+      dlqLoad.addEventListener('click', async () => {
+        try {
+          const res = await callApi('/api/dlq');
+          renderList(dlqList, res.queues || [], (queue) => {
+            const jobs = (queue.jobs || []).map((job) => `${job.id}:${job.name}`).join(', ');
+            return `<div><strong>${queue.queue}</strong> <span class="muted">${jobs || 'empty'}</span></div>`;
+          });
+        } catch (error) {
+          logStatus('dlq load ошибка', { error: error.message });
+        }
+      });
+
+      dlqReplay.addEventListener('click', async () => {
+        try {
+          const res = await callApi('/api/dlq/replay', {
+            method: 'POST',
+            body: JSON.stringify({
+              queue: dlqQueue.value,
+              job_id: dlqJobId.value,
+              reason: dlqReason.value || 'ui'
+            })
+          });
+          logStatus('dlq replay ok', res);
+        } catch (error) {
+          logStatus('dlq replay ошибка', { error: error.message });
+        }
+      });
+
+      dlqPurge.addEventListener('click', async () => {
+        try {
+          const res = await callApi('/api/dlq/purge', {
+            method: 'POST',
+            body: JSON.stringify({
+              queue: dlqQueue.value,
+              reason: dlqReason.value || 'ui'
+            })
+          });
+          logStatus('dlq purge ok', res);
+        } catch (error) {
+          logStatus('dlq purge ошибка', { error: error.message });
         }
       });
     </script>
