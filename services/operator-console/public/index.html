@@ -210,6 +210,22 @@
           <div class="list" id="ws-list"></div>
         </div>
         <div class="card">
+          <h3 class="section-title">Bundle</h3>
+          <p class="muted">Импорт/экспорт workspace JSON bundle.</p>
+          <div class="fields">
+            <div class="field">
+              <label>Reason</label>
+              <input id="bundle-reason" placeholder="reason" />
+            </div>
+          </div>
+          <label>Bundle JSON</label>
+          <textarea id="bundle-json">{\n  \"policies\": [],\n  \"connectors\": [],\n  \"secret_refs\": [],\n  \"configs\": [],\n  \"config_pointers\": []\n}</textarea>
+          <div class="toolbar stack">
+            <button id="bundle-export">Load export</button>
+            <button id="bundle-import">Import bundle</button>
+          </div>
+        </div>
+        <div class="card">
           <h3 class="section-title">Configs</h3>
           <p class="muted">Создание, активация, откат версий.</p>
           <div class="fields">
@@ -382,6 +398,10 @@
       const wsCreate = document.getElementById('ws-create');
       const wsLoad = document.getElementById('ws-load');
       const wsList = document.getElementById('ws-list');
+      const bundleReason = document.getElementById('bundle-reason');
+      const bundleJson = document.getElementById('bundle-json');
+      const bundleExport = document.getElementById('bundle-export');
+      const bundleImport = document.getElementById('bundle-import');
       const state = { policyId: null, connectorId: null };
       let source = null;
 
@@ -737,6 +757,30 @@
           });
         } catch (error) {
           logStatus('load workspaces ошибка', { error: error.message });
+        }
+      });
+
+      bundleExport.addEventListener('click', async () => {
+        try {
+          const res = await callApi('/api/bundle/export');
+          bundleJson.value = JSON.stringify(res, null, 2);
+          logStatus('bundle export ok');
+        } catch (error) {
+          logStatus('bundle export ошибка', { error: error.message });
+        }
+      });
+
+      bundleImport.addEventListener('click', async () => {
+        try {
+          const payload = parseJsonInput(bundleJson.value);
+          payload.reason = bundleReason.value || 'ui';
+          const res = await callApi('/api/bundle/import', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+          logStatus('bundle import ok', res);
+        } catch (error) {
+          logStatus('bundle import ошибка', { error: error.message });
         }
       });
     </script>

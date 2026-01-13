@@ -158,6 +158,16 @@ app.post('/api/workspaces/:id/invite', async (request, reply) => {
   return proxyJson(request, reply, url, 'POST');
 });
 
+app.get('/api/bundle/export', async (request, reply) => {
+  const url = new URL('/bundle/export', controlPlaneUrl);
+  return proxyJson(request, reply, url);
+});
+
+app.post('/api/bundle/import', async (request, reply) => {
+  const url = new URL('/bundle/import', controlPlaneUrl);
+  return proxyJson(request, reply, url, 'POST');
+});
+
 app.post('/api/execute', async (request, reply) => {
   if (!execPlaneUrl) {
     reply.status(503);
