@@ -450,7 +450,7 @@
           Orchestrator
         </div>
         <div class="menu">
-          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em;">Projects</div>
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em;">Workspaces</div>
           <button id="ws-list-load">Load workspaces</button>
           <div id="ws-list-mini" class="list"></div>
         </div>
@@ -486,6 +486,15 @@
               <option>beauty-dev</option>
             </select>
           </div>
+        </div>
+        <div class="toolbar">
+          <input id="flow-name" placeholder="flow name" value="flow" />
+          <span class="badge" id="flow-status">Draft</span>
+          <span class="badge success" id="flow-active">Active: —</span>
+          <button id="flow-save">Save draft</button>
+          <button id="flow-activate" class="secondary">Activate</button>
+          <button id="flow-rollback" class="secondary">Rollback</button>
+          <button id="flow-load-active" class="secondary">Load active</button>
         </div>
         <div class="canvas" id="canvas">
           <svg class="edges" id="edges"></svg>
@@ -618,6 +627,14 @@
           </div>
           <div class="list" id="cfg-list"></div>
           <div class="list" id="cfg-active-view"></div>
+          <div class="field">
+            <label>Saved JSON</label>
+            <textarea id="flow-saved" readonly></textarea>
+          </div>
+          <div class="field">
+            <label>Current JSON</label>
+            <textarea id="flow-current" readonly></textarea>
+          </div>
         </div>
 
         <div id="panel-policies" class="panel">
@@ -845,6 +862,10 @@
       let pendingConnection = null;
       const state = { policyId: null, connectorId: null };
       let source = null;
+      let lastSavedJson = '';
+      let lastSavedVersion = null;
+      let lastSavedConfigId = null;
+      let activeVersion = null;
 
       function escapeHtml(value) {
         return String(value ?? '')
@@ -861,7 +882,7 @@
         if (target) target.classList.add('active');
       }
 
-      function createNode({ title, type, endpoint, panel }) {
+      function createNode({ title, type, endpoint, panel, id }) {
         const node = document.createElement('div');
         node.className = 'node';
         node.style.left = `${40 + nodes.length * 40}px`;
@@ -870,6 +891,7 @@
         node.dataset.endpoint = endpoint || '';
         node.dataset.notes = '';
         node.dataset.panel = panel || 'panel-overview';
+        node.dataset.nodeId = id || crypto.randomUUID();
 
         node.innerHTML = `
           <div class="node-title">${title}</div>
@@ -893,6 +915,7 @@
         nodes.push(node);
         selectNode(node);
         renderEdges();
+        updateFlowJson();
       }
 
       function selectNode(node) {
@@ -949,10 +972,11 @@
 
       function completeConnection(targetNode) {
         if (!pendingConnection || pendingConnection === targetNode) return;
-        edges.push({ from: pendingConnection, to: targetNode });
+        edges.push({ from: pendingConnection.dataset.nodeId, to: targetNode.dataset.nodeId });
         pendingConnection.querySelector('.port.out').classList.remove('active');
         pendingConnection = null;
         renderEdges();
+        updateFlowJson();
       }
 
       function renderEdges() {
@@ -961,8 +985,11 @@
         edgesSvg.setAttribute('height', rect.height);
         edgesSvg.innerHTML = '';
         edges.forEach((edge) => {
-          const from = edge.from.getBoundingClientRect();
-          const to = edge.to.getBoundingClientRect();
+          const fromNode = nodes.find((n) => n.dataset.nodeId === edge.from);
+          const toNode = nodes.find((n) => n.dataset.nodeId === edge.to);
+          if (!fromNode || !toNode) return;
+          const from = fromNode.getBoundingClientRect();
+          const to = toNode.getBoundingClientRect();
           const startX = from.right - rect.left;
           const startY = from.top - rect.top + from.height / 2;
           const endX = to.left - rect.left;
@@ -1007,7 +1034,161 @@
         inspectForm.style.display = 'none';
         inspectEmpty.style.display = 'block';
         showPanel('panel-overview');
+        updateFlowJson();
       });
+
+      function getFlowConfig() {
+        return {
+          flow_name: document.getElementById('flow-name').value || 'flow',
+          nodes: nodes.map((node) => ({
+            id: node.dataset.nodeId,
+            title: node.querySelector('.node-title').textContent,
+            type: node.dataset.type,
+            endpoint: node.dataset.endpoint,
+            notes: node.dataset.notes || '',
+            x: Math.round(node.offsetLeft),
+            y: Math.round(node.offsetTop)
+          })),
+          edges: edges.map((edge) => ({ from: edge.from, to: edge.to }))
+        };
+      }
+
+      function loadFlowConfig(config) {
+        nodes.forEach((node) => node.remove());
+        nodes.length = 0;
+        edges.length = 0;
+        edgesSvg.innerHTML = '';
+        const panelMap = {
+          workspace: 'panel-workspaces',
+          config: 'panel-configs',
+          policy: 'panel-policies',
+          webhook: 'panel-webhooks',
+          dlq: 'panel-dlq',
+          api: 'panel-happy-path',
+          connector: 'panel-connectors',
+          audit: 'panel-audit',
+          events: 'panel-events'
+        };
+        (config.nodes || []).forEach((nodeData) => {
+          createNode({
+            title: nodeData.title || 'Block',
+            type: nodeData.type || 'api',
+            endpoint: nodeData.endpoint || '',
+            panel: panelMap[nodeData.type] || 'panel-overview',
+            id: nodeData.id
+          });
+          const node = nodes[nodes.length - 1];
+          node.style.left = `${nodeData.x || 40}px`;
+          node.style.top = `${nodeData.y || 40}px`;
+          node.dataset.notes = nodeData.notes || '';
+        });
+        (config.edges || []).forEach((edge) => edges.push(edge));
+        renderEdges();
+        updateFlowJson();
+      }
+
+      function updateFlowJson() {
+        const current = JSON.stringify(getFlowConfig(), null, 2);
+        document.getElementById('flow-current').value = current;
+        document.getElementById('flow-saved').value = lastSavedJson;
+        const status = current === lastSavedJson ? 'Saved' : 'Unsaved changes';
+        const badge = document.getElementById('flow-status');
+        badge.textContent = status;
+        badge.className = status === 'Saved' ? 'badge success' : 'badge warn';
+        document.getElementById('flow-active').textContent = activeVersion ? `Active: v${activeVersion}` : 'Active: —';
+      }
+
+      document.getElementById('flow-save').addEventListener('click', async () => {
+        try {
+          const flowName = document.getElementById('flow-name').value || 'flow';
+          const config = getFlowConfig();
+          const res = await callApi('/api/configs', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: flowName,
+              reason: 'flow draft',
+              config
+            })
+          });
+          lastSavedJson = JSON.stringify(config, null, 2);
+          lastSavedVersion = res.version;
+          lastSavedConfigId = res.id;
+          updateFlowJson();
+          logStatus('flow saved', res);
+        } catch (error) {
+          logStatus('flow save error', { error: error.message });
+        }
+      });
+
+      document.getElementById('flow-activate').addEventListener('click', async () => {
+        try {
+          const flowName = document.getElementById('flow-name').value || 'flow';
+          if (!lastSavedConfigId) {
+            logStatus('activate: save draft first');
+            return;
+          }
+          const res = await callApi('/api/configs/activate', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: flowName,
+              config_id: lastSavedConfigId,
+              reason: 'flow activate'
+            })
+          });
+          activeVersion = lastSavedVersion;
+          updateFlowJson();
+          logStatus('flow activate', res);
+        } catch (error) {
+          logStatus('flow activate error', { error: error.message });
+        }
+      });
+
+      document.getElementById('flow-load-active').addEventListener('click', async () => {
+        try {
+          const flowName = document.getElementById('flow-name').value || 'flow';
+          const res = await callApi(`/api/configs/active?name=${encodeURIComponent(flowName)}`);
+          lastSavedJson = JSON.stringify(res.active.config_json || {}, null, 2);
+          lastSavedVersion = res.active.version;
+          lastSavedConfigId = res.active.config_id;
+          activeVersion = res.active.version;
+          loadFlowConfig(res.active.config_json || {});
+        } catch (error) {
+          logStatus('flow load active error', { error: error.message });
+        }
+      });
+
+      document.getElementById('flow-rollback').addEventListener('click', async () => {
+        try {
+          const flowName = document.getElementById('flow-name').value || 'flow';
+          const res = await callApi(`/api/configs?name=${encodeURIComponent(flowName)}`);
+          const configs = (res.configs || []).slice().sort((a, b) => b.version - a.version);
+          const activeRes = await callApi(`/api/configs/active?name=${encodeURIComponent(flowName)}`);
+          const currentActiveVersion = activeRes.active?.version;
+          const previous = configs.find((cfg) => cfg.version < currentActiveVersion);
+          if (!previous) {
+            logStatus('rollback: previous not found');
+            return;
+          }
+          const act = await callApi('/api/configs/activate', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: flowName,
+              config_id: previous.id,
+              reason: 'flow rollback'
+            })
+          });
+          activeVersion = previous.version;
+          lastSavedVersion = previous.version;
+          lastSavedConfigId = previous.id;
+          lastSavedJson = JSON.stringify(previous.config_json || {}, null, 2);
+          loadFlowConfig(previous.config_json || {});
+          logStatus('flow rollback', act);
+        } catch (error) {
+          logStatus('flow rollback error', { error: error.message });
+        }
+      });
+
+      updateFlowJson();
 
       function addEvent(data) {
         const li = document.createElement('li');
