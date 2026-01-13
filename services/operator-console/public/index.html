@@ -1664,6 +1664,7 @@
           if (currentWorkspaceId) {
             workspaceSelect.value = currentWorkspaceId;
           }
+          await loadActiveFlow();
         } catch (error) {
           logStatus('workspace load error', { error: error.message });
         }
@@ -1674,7 +1675,32 @@
         if (currentWorkspaceId) {
           localStorage.setItem('workspace_id', currentWorkspaceId);
         }
+        loadActiveFlow();
       });
+
+      async function loadActiveFlow() {
+        try {
+          const flowName = document.getElementById('flow-name').value || 'flow';
+          const res = await callApi(`/api/configs/active?name=${encodeURIComponent(flowName)}`);
+          lastSavedJson = JSON.stringify(res.active.config_json || {}, null, 2);
+          lastSavedVersion = res.active.version;
+          lastSavedConfigId = res.active.config_id;
+          activeVersion = res.active.version;
+          lastSavedAt = new Date().toLocaleTimeString();
+          loadFlowConfig(res.active.config_json || {});
+        } catch (error) {
+          if (String(error.message || '').includes('config_not_active')) {
+            lastSavedJson = '';
+            lastSavedVersion = null;
+            lastSavedConfigId = null;
+            activeVersion = null;
+            lastSavedAt = null;
+            updateFlowJson();
+            return;
+          }
+          logStatus('flow auto-load error', { error: error.message });
+        }
+      }
 
       bundleExport.addEventListener('click', async () => {
         try {
