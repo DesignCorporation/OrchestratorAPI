@@ -227,6 +227,12 @@
         border: 1px solid var(--border);
       }
 
+      button.danger {
+        background: #fff1f2;
+        color: #b42318;
+        border: 1px solid #fda4af;
+      }
+
       input,
       textarea {
         border-radius: 10px;
@@ -268,6 +274,61 @@
         border-radius: 10px;
         padding: 10px 12px;
         font-size: 12px;
+      }
+
+      .table-wrap {
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      thead th {
+        text-align: left;
+        color: var(--muted);
+        font-weight: 600;
+        padding: 10px 8px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      tbody td {
+        padding: 10px 8px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      tbody tr:hover {
+        background: #f8f9fc;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #4f46e5;
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .badge.success {
+        background: #ecfdf3;
+        color: #027a48;
+      }
+
+      .badge.warn {
+        background: #fffaeb;
+        color: #b54708;
+      }
+
+      .badge.danger {
+        background: #fef3f2;
+        color: #b42318;
       }
 
       .status {
@@ -315,6 +376,39 @@
         border-radius: 999px;
         font-size: 12px;
         color: var(--muted);
+      }
+
+      .modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        place-items: center;
+        background: rgba(15, 23, 42, 0.2);
+        z-index: 100;
+      }
+
+      .modal.open {
+        display: grid;
+      }
+
+      .modal-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 20px;
+        width: min(420px, 92vw);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+
+      .modal-card h3 {
+        margin: 0 0 6px;
+      }
+
+      .modal-actions {
+        margin-top: 16px;
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
       }
 
       @media (max-width: 1024px) {
@@ -409,6 +503,37 @@
               <h3>Errors</h3>
               <div style="font-size: 28px; font-weight: 600;">3</div>
               <div class="muted">last 24h</div>
+            </div>
+          </div>
+        </section>
+
+        <section id="onboarding" class="section">
+          <div class="section-header">
+            <h2>Onboarding</h2>
+            <span class="pill">Workspace setup</span>
+          </div>
+          <div class="card">
+            <div class="fields">
+              <div class="field">
+                <label>Step 1</label>
+                <div class="badge">Create workspace</div>
+                <div class="muted">Заполни название, среду и invite.</div>
+              </div>
+              <div class="field">
+                <label>Step 2</label>
+                <div class="badge success">Import bundle</div>
+                <div class="muted">Policies, connectors, configs.</div>
+              </div>
+              <div class="field">
+                <label>Step 3</label>
+                <div class="badge warn">Test execute</div>
+                <div class="muted">Проверь happy‑path и события.</div>
+              </div>
+            </div>
+            <div class="toolbar">
+              <a href="#workspaces"><button>Create workspace</button></a>
+              <a href="#bundle"><button class="secondary">Import bundle</button></a>
+              <a href="#happy-path"><button class="secondary">Run execute</button></a>
             </div>
           </div>
         </section>
@@ -655,7 +780,7 @@
             <div class="toolbar">
               <button id="dlq-load" class="secondary">Load DLQ</button>
               <button id="dlq-replay">Replay job</button>
-              <button id="dlq-purge" class="secondary">Purge queue</button>
+              <button id="dlq-purge" class="danger">Purge queue</button>
             </div>
             <div class="list" id="dlq-list"></div>
           </div>
@@ -701,6 +826,16 @@
             <ul id="events"></ul>
           </div>
         </section>
+      </div>
+    </div>
+    <div class="modal" id="confirm-modal" role="dialog" aria-modal="true">
+      <div class="modal-card">
+        <h3 id="confirm-title">Confirm action</h3>
+        <p class="muted" id="confirm-message">Are you sure?</p>
+        <div class="modal-actions">
+          <button class="secondary" id="confirm-cancel">Cancel</button>
+          <button class="danger" id="confirm-accept">Confirm</button>
+        </div>
       </div>
     </div>
     <script>
@@ -768,8 +903,22 @@
       const dlqReplay = document.getElementById('dlq-replay');
       const dlqPurge = document.getElementById('dlq-purge');
       const dlqList = document.getElementById('dlq-list');
+      const confirmModal = document.getElementById('confirm-modal');
+      const confirmTitle = document.getElementById('confirm-title');
+      const confirmMessage = document.getElementById('confirm-message');
+      const confirmCancel = document.getElementById('confirm-cancel');
+      const confirmAccept = document.getElementById('confirm-accept');
       const state = { policyId: null, connectorId: null };
       let source = null;
+
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
 
       function addEvent(data) {
         const li = document.createElement('li');
@@ -819,6 +968,44 @@
           div.className = 'list-item';
           div.innerHTML = format(item);
           container.appendChild(div);
+        });
+      }
+
+      function renderTable(container, columns, rows) {
+        const header = columns.map((col) => `<th>${escapeHtml(col.label)}</th>`).join('');
+        const body =
+          rows.length === 0
+            ? `<tr><td colspan="${columns.length}"><span class="muted">empty</span></td></tr>`
+            : rows
+                .map(
+                  (row) =>
+                    `<tr>${columns
+                      .map((col) => {
+                        const value = col.render ? col.render(row) : escapeHtml(row[col.key]);
+                        return `<td>${value}</td>`;
+                      })
+                      .join('')}</tr>`
+                )
+                .join('');
+        container.innerHTML = `<div class="table-wrap"><table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table></div>`;
+      }
+
+      function confirmAction({ title, message, confirmLabel = 'Confirm' }) {
+        return new Promise((resolve) => {
+          confirmTitle.textContent = title;
+          confirmMessage.textContent = message;
+          confirmAccept.textContent = confirmLabel;
+          confirmModal.classList.add('open');
+
+          const cleanup = (result) => {
+            confirmModal.classList.remove('open');
+            confirmAccept.onclick = null;
+            confirmCancel.onclick = null;
+            resolve(result);
+          };
+
+          confirmAccept.onclick = () => cleanup(true);
+          confirmCancel.onclick = () => cleanup(false);
         });
       }
 
@@ -917,11 +1104,20 @@
           ]);
           const configs = res.configs || [];
           const activeId = active.active ? active.active.config_id : null;
-          renderList(cfgList, configs, (cfg) => {
-            const isActive = cfg.id === activeId;
-            const badge = isActive ? '<span class="muted">(active)</span>' : '';
-            return `<div><strong>${cfg.name}</strong> v${cfg.version} ${badge} <button data-id="${cfg.id}" class="secondary">Activate</button></div>`;
-          });
+          renderTable(cfgList, [
+            { key: 'name', label: 'Name' },
+            { key: 'version', label: 'Version' },
+            {
+              key: 'id',
+              label: 'Status',
+              render: (cfg) => (cfg.id === activeId ? '<span class="badge success">active</span>' : '<span class="badge">idle</span>')
+            },
+            {
+              key: 'id',
+              label: 'Actions',
+              render: (cfg) => `<button data-id="${cfg.id}" class="secondary">Activate</button>`
+            }
+          ], configs);
           cfgList.querySelectorAll('button').forEach((btn) => {
             btn.addEventListener('click', async () => {
               const id = btn.getAttribute('data-id');
@@ -1007,9 +1203,10 @@
       policyLoad.addEventListener('click', async () => {
         try {
           const res = await callApi('/api/policies');
-          renderList(policyList, res.policies || [], (policy) => {
-            return `<div><strong>${policy.name}</strong> (${policy.id})</div>`;
-          });
+          renderTable(policyList, [
+            { key: 'name', label: 'Name' },
+            { key: 'id', label: 'Policy ID' }
+          ], res.policies || []);
         } catch (error) {
           logStatus('load policies ошибка', { error: error.message });
         }
@@ -1038,9 +1235,12 @@
       connectorLoad.addEventListener('click', async () => {
         try {
           const res = await callApi('/api/connectors');
-          renderList(connectorList, res.connectors || [], (connector) => {
-            return `<div><strong>${connector.name}</strong> (${connector.type}) <span class="muted">${connector.id}</span></div>`;
-          });
+          renderTable(connectorList, [
+            { key: 'name', label: 'Name' },
+            { key: 'type', label: 'Type' },
+            { key: 'status', label: 'Status', render: (row) => `<span class="badge">${escapeHtml(row.status || 'active')}</span>` },
+            { key: 'id', label: 'Connector ID' }
+          ], res.connectors || []);
         } catch (error) {
           logStatus('load connectors ошибка', { error: error.message });
         }
@@ -1053,9 +1253,12 @@
           if (auditAction.value) params.set('action', auditAction.value);
           if (auditOperator.value) params.set('operator_id', auditOperator.value);
           const res = await callApi(`/api/audit-logs?${params.toString()}`);
-          renderList(auditList, res.audits || [], (row) => {
-            return `<div><strong>${row.action}</strong> ${row.resource_type}:${row.resource_id} <span class="muted">${row.created_at}</span></div>`;
-          });
+          renderTable(auditList, [
+            { key: 'action', label: 'Action' },
+            { key: 'resource_type', label: 'Resource' },
+            { key: 'resource_id', label: 'Resource ID' },
+            { key: 'created_at', label: 'At' }
+          ], res.audits || []);
         } catch (error) {
           logStatus('audit ошибка', { error: error.message });
         }
@@ -1080,9 +1283,27 @@
       wsLoad.addEventListener('click', async () => {
         try {
           const res = await callApi('/api/workspaces');
-          renderList(wsList, res.workspaces || [], (ws) => {
-            return `<div><strong>${ws.name}</strong> <span class="muted">${ws.env}</span> <span class="muted">${ws.status}</span> <span class="muted">${ws.id}</span><div class="toolbar"><button data-action="invite" data-id="${ws.id}">Invite</button><button data-action="enable" data-id="${ws.id}" class="secondary">Enable</button><button data-action="disable" data-id="${ws.id}" class="secondary">Disable</button></div></div>`;
-          });
+          renderTable(wsList, [
+            { key: 'name', label: 'Name' },
+            { key: 'env', label: 'Env' },
+            {
+              key: 'status',
+              label: 'Status',
+              render: (ws) =>
+                ws.status === 'active'
+                  ? '<span class="badge success">active</span>'
+                  : '<span class="badge danger">disabled</span>'
+            },
+            { key: 'id', label: 'Workspace ID' },
+            {
+              key: 'id',
+              label: 'Actions',
+              render: (ws) =>
+                `<button data-action="invite" data-id="${ws.id}">Invite</button>
+                 <button data-action="enable" data-id="${ws.id}" class="secondary">Enable</button>
+                 <button data-action="disable" data-id="${ws.id}" class="danger">Disable</button>`
+            }
+          ], res.workspaces || []);
           wsList.querySelectorAll('button').forEach((btn) => {
             btn.addEventListener('click', async () => {
               const id = btn.getAttribute('data-id');
@@ -1105,6 +1326,14 @@
                   logStatus('invite ошибка', { error: error.message });
                 }
                 return;
+              }
+              if (action === 'disable') {
+                const ok = await confirmAction({
+                  title: 'Disable workspace?',
+                  message: 'Workspace будет недоступен для exec/control.',
+                  confirmLabel: 'Disable'
+                });
+                if (!ok) return;
               }
               const status = action === 'enable' ? 'active' : 'disabled';
               try {
@@ -1158,9 +1387,12 @@
           if (inboxStatus.value) params.set('status', inboxStatus.value);
           if (inboxEvent.value) params.set('event_id', inboxEvent.value);
           const res = await callApi(`/api/webhook-inbox?${params.toString()}`);
-          renderList(inboxList, res.inbox || [], (row) => {
-            return `<div><strong>${row.provider}</strong> ${row.event_id} <span class="muted">${row.status}</span> <span class="muted">${row.received_at}</span></div>`;
-          });
+          renderTable(inboxList, [
+            { key: 'provider', label: 'Provider' },
+            { key: 'event_id', label: 'Event ID' },
+            { key: 'status', label: 'Status', render: (row) => `<span class="badge">${escapeHtml(row.status)}</span>` },
+            { key: 'received_at', label: 'Received' }
+          ], res.inbox || []);
         } catch (error) {
           logStatus('webhook inbox ошибка', { error: error.message });
         }
@@ -1169,10 +1401,17 @@
       dlqLoad.addEventListener('click', async () => {
         try {
           const res = await callApi('/api/dlq');
-          renderList(dlqList, res.queues || [], (queue) => {
-            const jobs = (queue.jobs || []).map((job) => `${job.id}:${job.name}`).join(', ');
-            return `<div><strong>${queue.queue}</strong> <span class="muted">${jobs || 'empty'}</span></div>`;
-          });
+          renderTable(dlqList, [
+            { key: 'queue', label: 'Queue' },
+            {
+              key: 'jobs',
+              label: 'Jobs',
+              render: (queue) => {
+                const jobs = (queue.jobs || []).map((job) => `${job.id}:${job.name}`).join(', ');
+                return escapeHtml(jobs || 'empty');
+              }
+            }
+          ], res.queues || []);
         } catch (error) {
           logStatus('dlq load ошибка', { error: error.message });
         }
@@ -1180,6 +1419,12 @@
 
       dlqReplay.addEventListener('click', async () => {
         try {
+          const ok = await confirmAction({
+            title: 'Replay job?',
+            message: 'Задача будет повторно выполнена.',
+            confirmLabel: 'Replay'
+          });
+          if (!ok) return;
           const res = await callApi('/api/dlq/replay', {
             method: 'POST',
             body: JSON.stringify({
@@ -1196,6 +1441,12 @@
 
       dlqPurge.addEventListener('click', async () => {
         try {
+          const ok = await confirmAction({
+            title: 'Purge queue?',
+            message: 'Все failed задачи будут удалены.',
+            confirmLabel: 'Purge'
+          });
+          if (!ok) return;
           const res = await callApi('/api/dlq/purge', {
             method: 'POST',
             body: JSON.stringify({
