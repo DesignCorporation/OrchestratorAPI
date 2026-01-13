@@ -67,6 +67,49 @@
 }
 ```
 
+## `POST /workspaces` (control)
+
+**Назначение:** создание workspace (invite-only).
+
+**Request**
+```json
+{
+  "name": "buildos-dev",
+  "env": "dev",
+  "reason": "init"
+}
+```
+
+**Response**
+```json
+{
+  "id": "uuid",
+  "default_policy_id": "uuid"
+}
+```
+
+## `POST /workspaces/:id/invite` (control)
+
+**Назначение:** создать invite link с TTL.
+
+**Request**
+```json
+{
+  "ttl_hours": 24,
+  "reason": "invite"
+}
+```
+
+**Response**
+```json
+{
+  "invite_id": "uuid",
+  "token": "string",
+  "expires_at": "iso8601",
+  "invite_url": "https://operator.orch.designcorp.eu/invite/<token>"
+}
+```
+
 **Response 200**
 ```json
 {

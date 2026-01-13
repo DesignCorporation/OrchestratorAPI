@@ -7,7 +7,7 @@
 - `exp`/`iat` (TTL 1–5 минут)
 - `jti` (защита от replay при необходимости)
 - `scopes`: массив строк, напр. `orchestrator.execute`, `orchestrator.jobs.write`, `orchestrator.control.read`
-- `tid`: tenant_id (если вызов tenant-scoped)
+- `tid`: workspace id (tenant_id)
 
 ## RBAC матрица (операторские роли)
 

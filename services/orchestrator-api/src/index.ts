@@ -222,6 +222,25 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function getDefaultPolicyForEnv(env: string) {
+  const base = {
+    retry_json: { max_attempts: 4, base_ms: 250, max_ms: 5000 },
+    timeout_json: { total_ms: 15000 },
+    circuit_breaker_json: { enabled: true, failure_threshold: 5, window_ms: 30000, open_ms: 30000 },
+    concurrency_json: { max_in_flight: 50 }
+  };
+  if (env === 'prod') {
+    return {
+      ...base,
+      rate_limit_json: { max_requests: 50, interval_ms: 1000, scope: 'tenant' }
+    };
+  }
+  return {
+    ...base,
+    rate_limit_json: { max_requests: 10, interval_ms: 1000, scope: 'tenant' }
+  };
+}
+
 function asObject(value: unknown): Record<string, unknown> {
   if (!value) return {};
   if (typeof value === 'string') {
@@ -473,6 +492,180 @@ function registerRoutes() {
 
   app.get('/health/live', async () => {
     return { status: 'ok' };
+  });
+
+  app.post('/workspaces', async (request, reply) => {
+    if (!requireScope(request, 'orchestrator.admin')) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 403, 'forbidden', 'forbidden');
+    }
+    if (!pgPool) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 500, 'db_not_configured', 'db_not_configured');
+    }
+
+    const body = request.body as { name?: string; env?: string; reason?: string };
+    if (!body?.name || !body?.env || !body?.reason) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 400, 'missing_name_or_env', 'missing_name_or_env');
+    }
+    if (body.env !== 'dev' && body.env !== 'prod') {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 400, 'invalid_env', 'invalid_env');
+    }
+
+    const workspaceId = randomUUID();
+    try {
+      await pgPool.query(
+        `INSERT INTO workspace (id, name, env, status)
+         VALUES ($1, $2, $3, $4)`,
+        [workspaceId, body.name, body.env, 'active']
+      );
+    } catch (error) {
+      const err = error as { code?: string };
+      if (err.code === '23505') {
+        return sendError(reply, request as { headers: Record<string, unknown> }, 409, 'workspace_name_taken', 'workspace_name_taken');
+      }
+      throw error;
+    }
+
+    const defaultPolicy = getDefaultPolicyForEnv(body.env);
+    const policyId = randomUUID();
+    await pgPool.query(
+      `INSERT INTO policy (id, tenant_id, name, rate_limit_json, retry_json, timeout_json, circuit_breaker_json, concurrency_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        policyId,
+        workspaceId,
+        'default',
+        defaultPolicy.rate_limit_json,
+        defaultPolicy.retry_json,
+        defaultPolicy.timeout_json,
+        defaultPolicy.circuit_breaker_json,
+        defaultPolicy.concurrency_json
+      ]
+    );
+
+    const operatorId = request.user?.sub && isUuid(request.user.sub) ? request.user.sub : defaultTenantId;
+    await logAudit({
+      operatorId,
+      action: 'workspace.create',
+      resourceType: 'workspace',
+      resourceId: workspaceId,
+      diff: { name: body.name, env: body.env },
+      reason: body.reason
+    });
+    await logAudit({
+      operatorId,
+      action: 'policy.create',
+      resourceType: 'policy',
+      resourceId: policyId,
+      diff: { name: 'default', workspace_id: workspaceId },
+      reason: 'workspace bootstrap'
+    });
+
+    return reply.status(201).send({ id: workspaceId, default_policy_id: policyId });
+  });
+
+  app.get('/workspaces', async (request, reply) => {
+    if (!requireScope(request, 'orchestrator.admin')) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 403, 'forbidden', 'forbidden');
+    }
+    if (!pgPool) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 500, 'db_not_configured', 'db_not_configured');
+    }
+
+    const query = request.query as { env?: string };
+    const params: Array<string> = [];
+    let where = '';
+    if (query.env) {
+      params.push(query.env);
+      where = `WHERE env = $${params.length}`;
+    }
+    const result = await pgPool.query(`SELECT * FROM workspace ${where} ORDER BY created_at DESC`, params);
+    return reply.status(200).send({ workspaces: result.rows });
+  });
+
+  app.patch('/workspaces/:id', async (request, reply) => {
+    if (!requireScope(request, 'orchestrator.admin')) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 403, 'forbidden', 'forbidden');
+    }
+    if (!pgPool) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 500, 'db_not_configured', 'db_not_configured');
+    }
+
+    const body = request.body as { status?: string; reason?: string };
+    if (!body?.status || !body?.reason) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 400, 'missing_status_or_reason', 'missing_status_or_reason');
+    }
+    if (body.status !== 'active' && body.status !== 'disabled') {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 400, 'invalid_status', 'invalid_status');
+    }
+
+    const workspaceId = (request.params as { id: string }).id;
+    const result = await pgPool.query(
+      `UPDATE workspace SET status = $1, updated_at = now() WHERE id = $2`,
+      [body.status, workspaceId]
+    );
+    if (result.rowCount === 0) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 404, 'workspace_not_found', 'workspace_not_found');
+    }
+
+    const operatorId = request.user?.sub && isUuid(request.user.sub) ? request.user.sub : defaultTenantId;
+    await logAudit({
+      operatorId,
+      action: 'workspace.update',
+      resourceType: 'workspace',
+      resourceId: workspaceId,
+      diff: { status: body.status },
+      reason: body.reason
+    });
+
+    return reply.status(200).send({ id: workspaceId, status: body.status });
+  });
+
+  app.post('/workspaces/:id/invite', async (request, reply) => {
+    if (!requireScope(request, 'orchestrator.admin')) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 403, 'forbidden', 'forbidden');
+    }
+    if (!pgPool) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 500, 'db_not_configured', 'db_not_configured');
+    }
+
+    const body = request.body as { ttl_hours?: number; reason?: string };
+    if (!body?.reason) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 400, 'missing_reason', 'missing_reason');
+    }
+    const ttlHours = typeof body.ttl_hours === 'number' && body.ttl_hours > 0 ? body.ttl_hours : 24;
+    const safeTtlHours = Math.min(ttlHours, 168);
+
+    const workspaceId = (request.params as { id: string }).id;
+    const workspaceRes = await pgPool.query('SELECT status FROM workspace WHERE id = $1', [workspaceId]);
+    if (workspaceRes.rowCount === 0) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 404, 'workspace_not_found', 'workspace_not_found');
+    }
+    if (workspaceRes.rows[0].status === 'disabled') {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 409, 'workspace_disabled', 'workspace_disabled');
+    }
+
+    const inviteId = randomUUID();
+    const token = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
+    const expiresAt = new Date(Date.now() + safeTtlHours * 60 * 60 * 1000);
+    await pgPool.query(
+      `INSERT INTO workspace_invite (id, workspace_id, token, expires_at, created_by)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [inviteId, workspaceId, token, expiresAt.toISOString(), request.user?.sub || null]
+    );
+
+    const operatorId = request.user?.sub && isUuid(request.user.sub) ? request.user.sub : defaultTenantId;
+    await logAudit({
+      operatorId,
+      action: 'workspace.invite',
+      resourceType: 'workspace',
+      resourceId: workspaceId,
+      diff: { invite_id: inviteId, expires_at: expiresAt.toISOString() },
+      reason: body.reason
+    });
+
+    const inviteBaseUrl = process.env.ORCH_INVITE_BASE_URL;
+    const inviteUrl = inviteBaseUrl ? `${inviteBaseUrl.replace(/\/$/, '')}/invite/${token}` : null;
+    return reply.status(201).send({ invite_id: inviteId, token, expires_at: expiresAt.toISOString(), invite_url: inviteUrl });
   });
 
   if (process.env.ENABLE_TEST_ROUTES === 'true') {
@@ -1782,7 +1975,13 @@ async function start() {
     }
     if (
       apiMode === 'exec' &&
-      (pathname.startsWith('/admin') || pathname.startsWith('/events') || pathname.startsWith('/webhooks') || pathname.startsWith('/metrics'))
+      (
+        pathname.startsWith('/admin') ||
+        pathname.startsWith('/events') ||
+        pathname.startsWith('/webhooks') ||
+        pathname.startsWith('/metrics') ||
+        pathname.startsWith('/workspaces')
+      )
     ) {
       return sendError(reply, request as { headers: Record<string, unknown> }, 404, 'not_found', 'not_found');
     }

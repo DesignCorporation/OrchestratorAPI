@@ -43,6 +43,13 @@ All error responses use the same JSON shape:
 - `missing_type_or_name`
 - `missing_provider_ref_or_reason`
 - `missing_name_or_reason`
+- `missing_name_or_env`
+- `invalid_env`
+- `workspace_name_taken`
+- `missing_status_or_reason`
+- `invalid_status`
+- `workspace_not_found`
+- `workspace_disabled`
 - `not_found`
 - `auth_required`
 - `invalid_token`

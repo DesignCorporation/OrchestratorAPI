@@ -2,6 +2,18 @@
 
 Краткие схемы ключевых таблиц, чтобы консистентно делать миграции и UI.
 
+## Workspace
+- `id (uuid)`, `name (text, unique)`, `env (text)`
+- `status (text)` (active|disabled)
+- `created_at`, `updated_at`
+- индексы: `(env, status)`
+
+## WorkspaceInvite
+- `id (uuid)`, `workspace_id (uuid)`
+- `token (text, unique)`, `expires_at`, `used_at (nullable)`
+- `created_by (uuid, nullable)`, `created_at`
+- индексы: `(workspace_id)`
+
 ## Connector
 - `id (uuid)`, `tenant_id (uuid)`
 - `type (text)`, `name (text)`, `status (text)`
