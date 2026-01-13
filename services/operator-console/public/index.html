@@ -525,6 +525,9 @@
             <label>Notes</label>
             <textarea id="node-notes"></textarea>
           </div>
+          <div class="toolbar">
+            <button id="node-delete" class="danger">Delete block</button>
+          </div>
         </div>
 
         <div id="panel-overview" class="panel active">
@@ -785,6 +788,7 @@
       const nodeType = document.getElementById('node-type');
       const nodeEndpoint = document.getElementById('node-endpoint');
       const nodeNotes = document.getElementById('node-notes');
+      const nodeDelete = document.getElementById('node-delete');
       const panels = document.querySelectorAll('.panel');
       const list = document.getElementById('events');
       const connectBtn = document.getElementById('connect');
@@ -941,6 +945,13 @@
         showPanel(node.dataset.panel);
       }
 
+      function deselectNode() {
+        nodes.forEach((n) => n.classList.remove('selected'));
+        activeNode = null;
+        inspectForm.style.display = 'none';
+        inspectEmpty.style.display = 'block';
+      }
+
       function updateNode() {
         if (!activeNode) return;
         activeNode.dataset.type = nodeType.value;
@@ -1039,10 +1050,31 @@
         nodes.length = 0;
         edges.length = 0;
         edgesSvg.innerHTML = '';
-        activeNode = null;
-        inspectForm.style.display = 'none';
-        inspectEmpty.style.display = 'block';
+        deselectNode();
         showPanel('panel-overview');
+        updateFlowJson();
+        updateDiffLabel();
+      });
+
+      canvas.addEventListener('click', (event) => {
+        if (event.target === canvas || event.target === edgesSvg) {
+          deselectNode();
+        }
+      });
+
+      nodeDelete.addEventListener('click', () => {
+        if (!activeNode) return;
+        const nodeId = activeNode.dataset.nodeId;
+        activeNode.remove();
+        const idx = nodes.findIndex((n) => n.dataset.nodeId === nodeId);
+        if (idx >= 0) nodes.splice(idx, 1);
+        for (let i = edges.length - 1; i >= 0; i -= 1) {
+          if (edges[i].from === nodeId || edges[i].to === nodeId) {
+            edges.splice(i, 1);
+          }
+        }
+        deselectNode();
+        renderEdges();
         updateFlowJson();
         updateDiffLabel();
       });
