@@ -480,11 +480,7 @@
           </div>
           <div class="workspace-switch">
             <label>Workspace</label>
-            <select>
-              <option>buildos-dev</option>
-              <option>buildos-prod</option>
-              <option>beauty-dev</option>
-            </select>
+            <select id="workspace-select"></select>
           </div>
         </div>
         <div class="toolbar">
@@ -835,6 +831,7 @@
       const wsList = document.getElementById('ws-list');
       const wsListMini = document.getElementById('ws-list-mini');
       const wsListLoad = document.getElementById('ws-list-load');
+      const workspaceSelect = document.getElementById('workspace-select');
       const bundleReason = document.getElementById('bundle-reason');
       const bundleJson = document.getElementById('bundle-json');
       const bundleExport = document.getElementById('bundle-export');
@@ -867,6 +864,7 @@
       let lastSavedVersion = null;
       let lastSavedConfigId = null;
       let activeVersion = null;
+      let currentWorkspaceId = null;
       let lastSavedAt = null;
 
       function escapeHtml(value) {
@@ -1213,7 +1211,10 @@
 
       async function callApi(path, options = {}) {
         const res = await fetch(path, {
-          headers: { 'content-type': 'application/json' },
+          headers: {
+            'content-type': 'application/json',
+            ...(currentWorkspaceId ? { 'x-tenant-id': currentWorkspaceId } : {})
+          },
           ...options
         });
         const text = await res.text();
@@ -1288,13 +1289,15 @@
 
       connectBtn.addEventListener('click', () => {
         if (source) source.close();
-        source = new EventSource('/api/events/stream');
+        const query = currentWorkspaceId ? `?tenant_id=${encodeURIComponent(currentWorkspaceId)}` : '';
+        source = new EventSource(`/api/events/stream${query}`);
         source.onmessage = (event) => addEvent(event.data);
         source.onerror = () => addEvent('sse error');
       });
 
       loadBtn.addEventListener('click', async () => {
-        const res = await fetch('/api/events?limit=50');
+        const query = currentWorkspaceId ? `&tenant_id=${encodeURIComponent(currentWorkspaceId)}` : '';
+        const res = await fetch(`/api/events?limit=50${query}`);
         const json = await res.json();
         list.innerHTML = '';
         (json.events || []).forEach((event) => addEvent(JSON.stringify(event)));
@@ -1644,6 +1647,35 @@
         }
       });
 
+      async function loadWorkspaceOptions() {
+        try {
+          const res = await callApi('/api/workspaces');
+          const workspaces = res.workspaces || [];
+          workspaceSelect.innerHTML = '';
+          workspaces.forEach((ws) => {
+            const option = document.createElement('option');
+            option.value = ws.id;
+            option.textContent = `${ws.name} (${ws.env})`;
+            workspaceSelect.appendChild(option);
+          });
+          const saved = localStorage.getItem('workspace_id');
+          const first = workspaces[0]?.id || null;
+          currentWorkspaceId = saved && workspaces.find((w) => w.id === saved) ? saved : first;
+          if (currentWorkspaceId) {
+            workspaceSelect.value = currentWorkspaceId;
+          }
+        } catch (error) {
+          logStatus('workspace load error', { error: error.message });
+        }
+      }
+
+      workspaceSelect.addEventListener('change', () => {
+        currentWorkspaceId = workspaceSelect.value || null;
+        if (currentWorkspaceId) {
+          localStorage.setItem('workspace_id', currentWorkspaceId);
+        }
+      });
+
       bundleExport.addEventListener('click', async () => {
         try {
           const res = await callApi('/api/bundle/export');
@@ -1748,6 +1780,8 @@
           logStatus('dlq purge ошибка', { error: error.message });
         }
       });
+
+      loadWorkspaceOptions();
     </script>
   </body>
 </html>

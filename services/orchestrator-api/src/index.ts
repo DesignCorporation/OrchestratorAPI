@@ -2667,7 +2667,18 @@ async function start() {
     reply.header('x-trace-id', context.traceId);
     request.log.info({ method: request.method, url: request.url }, 'request_received');
 
-    if (authMode !== 'enabled') return;
+    if (authMode !== 'enabled') {
+      const tenantHeader = request.headers['x-tenant-id'];
+      if (typeof tenantHeader === 'string' && isUuid(tenantHeader)) {
+        request.user = {
+          tid: tenantHeader,
+          scopes: [],
+          role: undefined,
+          sub: undefined
+        };
+      }
+      return;
+    }
     const pathname = request.raw.url?.split('?')[0] || '';
     if (isOpenPath(pathname)) return;
 

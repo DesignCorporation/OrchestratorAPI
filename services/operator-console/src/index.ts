@@ -65,6 +65,8 @@ function buildHeaders(request: FastifyRequest): Record<string, string> {
   const traceId = request.headers['x-trace-id'];
   if (typeof requestId === 'string') headers['x-request-id'] = requestId;
   if (typeof traceId === 'string') headers['x-trace-id'] = traceId;
+  const tenantId = request.headers['x-tenant-id'];
+  if (typeof tenantId === 'string') headers['x-tenant-id'] = tenantId;
   return headers;
 }
 
