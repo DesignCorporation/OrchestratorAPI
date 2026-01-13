@@ -1,6 +1,6 @@
-# Orchestrator API — Tenant Onboarding Guide (BuildOS/Beauty) + Implementation Checklist
+# Orchestrator API — Workspace Onboarding Guide (BuildOS/Beauty) + Implementation Checklist
 
-Документ объясняет **как подключать новые продукты** (BuildOS, Beauty и др.) к Orchestrator API через модель **Tenant/Workspace**, и даёт **чеклист реализации**, чтобы масштабироваться без путаницы.
+Документ объясняет **как подключать новые продукты** (BuildOS, Beauty и др.) к Orchestrator API через модель **Workspace**, и даёт **чеклист реализации**, чтобы масштабироваться без путаницы.
 
 ---
 
@@ -19,7 +19,7 @@
 
 ### 1.2 Onboard Product (для каждого продукта)
 Это подключение продукта как **Workspace** в Orchestrator SaaS:
-- создаём tenant (например `buildos-prod`)
+- создаём workspace (например `buildos-prod`)
 - настраиваем connectors/policies/configs
 - выдаём S2S доступ (JWT claims/scopes)
 - настраиваем webhooks routing
@@ -32,13 +32,13 @@
 ## 2) Рекомендуемый operating mode
 
 ### 2.1 Shared Orchestrator (общий на компанию)
-Один Orchestrator SaaS обслуживает несколько продуктов (BuildOS, Beauty) и изолирует их через tenant_id.
+Один Orchestrator SaaS обслуживает несколько продуктов (BuildOS, Beauty) и изолирует их через `tenant_id` (workspace id).
 
 **Почему:** меньше ops, меньше стоимости, единый процесс эксплуатации, единый Operator Console.
 
 ### 2.2 Строгое разделение окружений
-- `orch.prod` обслуживает только `*-prod` tenants
-- `orch.dev` обслуживает только `*-dev` tenants
+- `orch.prod` обслуживает только `*-prod` workspaces
+- `orch.dev` обслуживает только `*-dev` workspaces
 
 **Запрещено:** использовать prod секреты в dev или наоборот.
 
@@ -94,7 +94,7 @@ Fallback: **polling** через `/jobs/:id` и `/events`.
 - BreakGlass (аварийно)
 
 6) **Webhook routing**
-- маппинг `provider_account_id`/signing_secret → tenant
+- маппинг `provider_account_id`/signing_secret → workspace
 
 ---
 
@@ -119,7 +119,7 @@ Fallback: **polling** через `/jobs/:id` и `/events`.
 - [ ] Хранение токенов: в secrets file (`/opt/orchestrator/secrets/...`) или vault
 
 ### 5.4 Policies
-- [ ] Создать default policy для tenant
+- [ ] Создать default policy для workspace
 - [ ] Зафиксировать лимиты (rate/concurrency)
 - [ ] Подключить policy к connector(ам)
 
@@ -128,21 +128,21 @@ Fallback: **polling** через `/jobs/:id` и `/events`.
 - [ ] Проверить: секреты не попадают в БД/логи
 
 ### 5.6 Connectors
-- [ ] Создать connector(ы) для tenant
+- [ ] Создать connector(ы) для workspace
 - [ ] Привязать policy + secret refs
 
 ### 5.7 Webhooks
 - [ ] Настроить Stripe webhook endpoint на Orchestrator
 - [ ] Проверить verify signature
 - [ ] Проверить dedupe (повторный event_id)
- - [ ] Привязать routing provider account_id → workspace
+- [ ] Привязать routing provider account_id → workspace
 
 ### 5.8 Тестовый прогон (обязателен)
 - [ ] /execute happy path
 - [ ] timeout/retry/breaker сценарий
 - [ ] webhook → inbox → job → worker → product callback
 - [ ] Event stream показывает полный путь
- - [ ] Fallback polling (если callback невозможен)
+- [ ] Fallback polling (если callback невозможен)
 
 ### 5.9 Ops readiness
 - [ ] Retention политика согласована
@@ -153,7 +153,7 @@ Fallback: **polling** через `/jobs/:id` и `/events`.
 
 ## 6) Implementation checklist (для дальнейшей реализации платформы)
 
-Этот чеклист — для развития Orchestrator как "коробки".
+Этот чеклист — для развития Orchestrator как SaaS.
 
 ### 6.1 Workspace onboarding automation
 - [ ] Endpoint/команда: `POST /workspaces` (или seed script) для создания workspace + дефолт policy
@@ -217,4 +217,4 @@ Fallback: **polling** через `/jobs/:id` и `/events`.
 ## 9) Next step
 
 Рекомендуемый следующий практический шаг:
-- **Onboard Beauty-dev** как второй tenant и прогнать весь flow (execute + stripe webhook fixture), чтобы подтвердить мульти-тенант разделение и процедуры.
+- **Onboard Beauty-dev** как второй workspace и прогнать весь flow (execute + stripe webhook fixture), чтобы подтвердить мульти-workspace разделение и процедуры.

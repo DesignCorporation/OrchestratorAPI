@@ -80,7 +80,7 @@ Backend:
 - Idempotency for `/execute` (cache + conflict semantics).
 - Stripe webhook ingress: verify + dedupe + enqueue.
 - Policy engine MVP: retry/timeout, rate limit, circuit breaker.
-- Multi-tenant: `tenant_id` from JWT + impersonation.
+- Workspace isolation: `tenant_id` from JWT + impersonation.
 - Impersonation currently via `x-impersonate-*` headers + audit.
 - Worker: job lifecycle + event_log + JSON logging with correlation/trace.
 
@@ -141,14 +141,14 @@ Each product (BuildOS, Beauty, future apps) is a **workspace**. Workspaces are i
    - `svc:<product>-backend` for exec plane (`aud=orchestrator-exec`)
    - `svc:operator-console` for control plane (`aud=orchestrator-control`)
 4) **Import JSON bundle** (policies/connectors/secret refs/configs).
-5) **Webhook routing**: map provider account id → tenant.
+5) **Webhook routing**: map provider account id → workspace.
 
 ### 1.5 JSON bundle (ops-friendly)
-Support an import/export format so onboarding is fast and consistent across tenants.
+Support an import/export format so onboarding is fast and consistent across workspaces.
 Minimal bundle structure:
 ```json
 {
-  "tenant": { "name": "buildos-dev" },
+  "workspace": { "name": "buildos-dev" },
   "policies": [{ "name": "default", "timeout_json": { "total_ms": 5000 } }],
   "secret_refs": [{ "name": "stripe_signing", "ref": "env://STRIPE_SIGNING_SECRET" }],
   "connectors": [{ "type": "http", "name": "stripe", "policy": "default", "secret_ref": "stripe_signing" }],
@@ -204,7 +204,7 @@ Operator Console generates forms from JSON Schema:
 
 ## 4) Data model (summary)
 
-Core tables (tenant-scoped unless stated otherwise):
+Core tables (workspace-scoped unless stated otherwise):
 - `Connector`
 - `Policy`
 - `SecretRef`
@@ -246,8 +246,8 @@ Retention policy and payload storage should be documented separately.
 - Timeouts: connect/read/total
 - Retries: exponential backoff + jitter, capped attempts
 - Circuit breaker: rolling window + thresholds + half-open probes
-- Rate limits: token bucket (tenant+connector+operation)
-- Quotas v1: tenant-level RPS, concurrency, queue depth, plus edge rate limit.
+- Rate limits: token bucket (workspace+connector+operation)
+- Quotas v1: workspace-level RPS, concurrency, queue depth, plus edge rate limit.
 - Idempotency: `/execute` and `/jobs` keyed by `(tenant_id, idempotency_key)`
 - DLQ: replay/purge with audit
 - Degradation: fail-fast on open breaker, or queue with delay

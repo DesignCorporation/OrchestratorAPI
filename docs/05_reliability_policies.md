@@ -20,8 +20,8 @@
 - open duration: 30s
 - half-open probes: 5
 
-**Rate limit (default, per tenant + connector)**
+**Rate limit (default, per workspace + connector)**
 - 10 rps, burst 20
 
-**Concurrency (default, per tenant + connector)**
+**Concurrency (default, per workspace + connector)**
 - 50 in-flight

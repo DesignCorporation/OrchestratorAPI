@@ -15,9 +15,9 @@
 **Idempotency**
 - `Idempotency-Key` — для `/execute` и `/jobs` (опционально, но рекомендуется для клиентов).
 
-**Tenant context**
-- Внутренние сервисы передают tenant в JWT claim `tid`.
-- Внешние webhooks определяют tenant по endpoint mapping (MVP: один tenant; v1: routing table по `:provider` + `account_id`/`signing_secret`).
+**Workspace context**
+- Внутренние сервисы передают workspace через JWT claim `tid` (tenant_id).
+- Внешние webhooks определяют workspace по endpoint mapping (MVP: один workspace; v1: routing table по `:provider` + `account_id`/`signing_secret`).
 
 ## Единый формат ошибок
 

@@ -56,17 +56,17 @@
 - [ ] **ISSUE-051: Retries + backoff + jitter**
   - DoD: retriable ошибки повторяются по политике.
 
-- [ ] **ISSUE-052: Circuit breaker per tenant+connector**
+- [ ] **ISSUE-052: Circuit breaker per workspace+connector**
   - DoD: состояния closed/open/half-open, метрики состояния.
 
 - [ ] **ISSUE-053: Rate limit v0 (token bucket) в Redis**
-  - DoD: лимиты per tenant, drops логируются.
+  - DoD: лимиты per workspace, drops логируются.
 
 ## EPIC-06: Security (S2S auth, RBAC, Audit)
 - [ ] **ISSUE-060: Service-to-service auth (JWT short TTL)**
   - DoD: aud/iss/scopes; отказ по неверному audience.
 
-- [ ] **ISSUE-061: Operator RBAC (separate from tenant RBAC)**
+- [ ] **ISSUE-061: Operator RBAC (separate from workspace RBAC)**
   - DoD: роли Support/Billing/Admin/ReadOnly; guard на endpoints.
 
 - [ ] **ISSUE-062: OperatorAuditLog (diff_json + reason обязательны)**
@@ -86,7 +86,7 @@
   - DoD: endpoint `/metrics` или экспортер.
 
 - [ ] **ISSUE-072: Event stream endpoint `/events/stream` (SSE)**
-  - DoD: фильтрация по tenant/connector/trace_id.
+  - DoD: фильтрация по workspace/connector/trace_id.
 
 ## EPIC-08: Operator Console Integration
 - [ ] **ISSUE-080: Страница “Events (terminal-like)”**

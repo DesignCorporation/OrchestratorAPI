@@ -19,7 +19,7 @@
 
 ## v1 (4–6 недель)
 - Коннекторы: SMTP, S3/MinIO, Generic HTTP
-- Политики: per-tenant quotas, concurrency limits, staged rollout конфигов
+- Политики: per-workspace quotas, concurrency limits, staged rollout конфигов
 - Config versioning + activate/rollback UI
 - Улучшение диагностики: request replay (без секретов)
 

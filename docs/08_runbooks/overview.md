@@ -14,7 +14,7 @@
 Цель: проверить поток без UI, затем подключить Operator Console.
 
 1) Поднять `docker-compose.dev.yml`.
-2) Применить миграции + `seed-dev.sh` (создать tenant + stripe connector + policy).
+2) Применить миграции + `seed-dev.sh` (создать workspace + stripe connector + policy).
 3) Отправить fixture webhook на `POST /webhooks/stripe`.
 
 Ожидаемые EventLog (по порядку):

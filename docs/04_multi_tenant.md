@@ -1,7 +1,7 @@
-# Multi-tenant enforcement (MVP)
+# Workspace isolation (MVP)
 
 ## Где enforced tenant_id
-- Middleware на входе: tenant берётся из JWT (`tid`) и прокидывается в context.
+- Middleware на входе: workspace берётся из JWT (`tid`) и прокидывается в context.
 - Любая операция записи/чтения обязана фильтровать по `tenant_id`.
 
 ## DB уровень (опционально, v1)
