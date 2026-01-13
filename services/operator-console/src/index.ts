@@ -133,6 +133,31 @@ app.get('/api/audit-logs', async (request, reply) => {
   return proxyJson(request, reply, url);
 });
 
+app.get('/api/workspaces', async (request, reply) => {
+  const url = new URL('/workspaces', controlPlaneUrl);
+  for (const [key, value] of Object.entries(request.query as Record<string, string>)) {
+    url.searchParams.set(key, value);
+  }
+  return proxyJson(request, reply, url);
+});
+
+app.post('/api/workspaces', async (request, reply) => {
+  const url = new URL('/workspaces', controlPlaneUrl);
+  return proxyJson(request, reply, url, 'POST');
+});
+
+app.patch('/api/workspaces/:id', async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const url = new URL(`/workspaces/${id}`, controlPlaneUrl);
+  return proxyJson(request, reply, url, 'PATCH');
+});
+
+app.post('/api/workspaces/:id/invite', async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const url = new URL(`/workspaces/${id}/invite`, controlPlaneUrl);
+  return proxyJson(request, reply, url, 'POST');
+});
+
 app.post('/api/execute', async (request, reply) => {
   if (!execPlaneUrl) {
     reply.status(503);

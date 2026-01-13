@@ -175,6 +175,41 @@
       </div>
       <div class="grid">
         <div class="card">
+          <h3 class="section-title">Workspaces</h3>
+          <p class="muted">Создание, приглашения и статус.</p>
+          <div class="fields">
+            <div class="field">
+              <label>Workspace name</label>
+              <input id="ws-name" value="buildos-dev" />
+            </div>
+            <div class="field">
+              <label>Env</label>
+              <input id="ws-env" value="dev" />
+            </div>
+            <div class="field">
+              <label>Reason</label>
+              <input id="ws-reason" placeholder="reason" />
+            </div>
+            <div class="field">
+              <label>Invite TTL (hours)</label>
+              <input id="ws-invite-ttl" value="24" />
+            </div>
+            <div class="field">
+              <label>Invite max uses</label>
+              <input id="ws-invite-uses" value="1" />
+            </div>
+            <div class="field">
+              <label>Invite base URL (optional)</label>
+              <input id="ws-invite-base" placeholder="https://orch.designcorp.eu" />
+            </div>
+          </div>
+          <div class="toolbar stack">
+            <button id="ws-create">Create workspace</button>
+            <button id="ws-load">Load workspaces</button>
+          </div>
+          <div class="list" id="ws-list"></div>
+        </div>
+        <div class="card">
           <h3 class="section-title">Configs</h3>
           <p class="muted">Создание, активация, откат версий.</p>
           <div class="fields">
@@ -338,6 +373,15 @@
       const auditOperator = document.getElementById('audit-operator');
       const auditLoad = document.getElementById('audit-load');
       const auditList = document.getElementById('audit-list');
+      const wsName = document.getElementById('ws-name');
+      const wsEnv = document.getElementById('ws-env');
+      const wsReason = document.getElementById('ws-reason');
+      const wsInviteTtl = document.getElementById('ws-invite-ttl');
+      const wsInviteUses = document.getElementById('ws-invite-uses');
+      const wsInviteBase = document.getElementById('ws-invite-base');
+      const wsCreate = document.getElementById('ws-create');
+      const wsLoad = document.getElementById('ws-load');
+      const wsList = document.getElementById('ws-list');
       const state = { policyId: null, connectorId: null };
       let source = null;
 
@@ -628,6 +672,71 @@
           });
         } catch (error) {
           logStatus('audit ошибка', { error: error.message });
+        }
+      });
+
+      wsCreate.addEventListener('click', async () => {
+        try {
+          const res = await callApi('/api/workspaces', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: wsName.value,
+              env: wsEnv.value,
+              reason: wsReason.value || 'ui'
+            })
+          });
+          logStatus('workspace создан', res);
+        } catch (error) {
+          logStatus('workspace ошибка', { error: error.message });
+        }
+      });
+
+      wsLoad.addEventListener('click', async () => {
+        try {
+          const res = await callApi('/api/workspaces');
+          renderList(wsList, res.workspaces || [], (ws) => {
+            return `<div class=\"row\"><strong>${ws.name}</strong> <span class=\"muted\">${ws.env}</span> <span class=\"muted\">${ws.status}</span> <span class=\"muted\">${ws.id}</span><button data-action=\"invite\" data-id=\"${ws.id}\">Invite</button><button data-action=\"enable\" data-id=\"${ws.id}\">Enable</button><button data-action=\"disable\" data-id=\"${ws.id}\">Disable</button></div>`;
+          });
+          wsList.querySelectorAll('button').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              const id = btn.getAttribute('data-id');
+              const action = btn.getAttribute('data-action');
+              if (!id || !action) return;
+              if (action === 'invite') {
+                const payload = { reason: wsReason.value || 'ui' };
+                const ttl = Number(wsInviteTtl.value);
+                const uses = Number(wsInviteUses.value);
+                if (Number.isFinite(ttl) && ttl > 0) payload.ttl_hours = ttl;
+                if (Number.isFinite(uses) && uses > 0) payload.max_uses = uses;
+                if (wsInviteBase.value) payload.base_url = wsInviteBase.value;
+                try {
+                  const resp = await callApi(`/api/workspaces/${id}/invite`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                  });
+                  logStatus('invite создан', resp);
+                } catch (error) {
+                  logStatus('invite ошибка', { error: error.message });
+                }
+                return;
+              }
+              const status = action === 'enable' ? 'active' : 'disabled';
+              try {
+                const resp = await callApi(`/api/workspaces/${id}`, {
+                  method: 'PATCH',
+                  body: JSON.stringify({
+                    status,
+                    reason: wsReason.value || 'ui'
+                  })
+                });
+                logStatus('workspace updated', resp);
+              } catch (error) {
+                logStatus('workspace update ошибка', { error: error.message });
+              }
+            });
+          });
+        } catch (error) {
+          logStatus('load workspaces ошибка', { error: error.message });
         }
       });
     </script>
