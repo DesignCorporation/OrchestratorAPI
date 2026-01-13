@@ -460,7 +460,6 @@
           <button id="add-policy">Policy block</button>
           <button id="add-webhook">Webhook block</button>
           <button id="add-workspace">Workspace block</button>
-          <button id="add-config">Config block</button>
           <button id="add-dlq">DLQ block</button>
           <button id="reset" class="danger">Reset canvas</button>
         </div>
@@ -605,8 +604,8 @@
           <div class="status" id="status"></div>
         </div>
 
-        <div id="panel-configs" class="panel">
-          <h4>Configs</h4>
+        <div id="panel-configs" class="panel active">
+          <h4>Configs & Versions</h4>
           <div class="field">
             <label>Config name</label>
             <input id="cfg-name" value="demo-config" />
@@ -884,7 +883,10 @@
       }
 
       function showPanel(panelId) {
-        panels.forEach((panel) => panel.classList.remove('active'));
+        panels.forEach((panel) => {
+          if (panel.id === 'panel-configs') return;
+          panel.classList.remove('active');
+        });
         const target = document.getElementById(panelId);
         if (target) target.classList.add('active');
       }
@@ -1028,9 +1030,6 @@
       );
       document.getElementById('add-workspace').addEventListener('click', () =>
         createNode({ title: 'Workspace', type: 'workspace', endpoint: 'buildos-dev', panel: 'panel-workspaces' })
-      );
-      document.getElementById('add-config').addEventListener('click', () =>
-        createNode({ title: 'Config', type: 'config', endpoint: '/configs', panel: 'panel-configs' })
       );
       document.getElementById('add-dlq').addEventListener('click', () =>
         createNode({ title: 'DLQ', type: 'dlq', endpoint: '/admin/dlq', panel: 'panel-dlq' })
