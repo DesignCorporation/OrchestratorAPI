@@ -496,6 +496,7 @@
           <button id="flow-rollback" class="secondary">Rollback</button>
           <button id="flow-load-active" class="secondary">Load active</button>
         </div>
+        <div class="muted" id="flow-message">No changes yet.</div>
         <div class="canvas" id="canvas">
           <svg class="edges" id="edges"></svg>
         </div>
@@ -866,6 +867,7 @@
       let lastSavedVersion = null;
       let lastSavedConfigId = null;
       let activeVersion = null;
+      let lastSavedAt = null;
 
       function escapeHtml(value) {
         return String(value ?? '')
@@ -1096,6 +1098,8 @@
         badge.textContent = status;
         badge.className = status === 'Saved' ? 'badge success' : 'badge warn';
         document.getElementById('flow-active').textContent = activeVersion ? `Active: v${activeVersion}` : 'Active: —';
+        const savedInfo = lastSavedAt && lastSavedVersion ? `Last saved v${lastSavedVersion} at ${lastSavedAt}` : 'Not saved yet.';
+        document.getElementById('flow-message').textContent = savedInfo;
       }
 
       document.getElementById('flow-save').addEventListener('click', async () => {
@@ -1113,6 +1117,7 @@
           lastSavedJson = JSON.stringify(config, null, 2);
           lastSavedVersion = res.version;
           lastSavedConfigId = res.id;
+          lastSavedAt = new Date().toLocaleTimeString();
           updateFlowJson();
           logStatus('flow saved', res);
         } catch (error) {
@@ -1124,7 +1129,7 @@
         try {
           const flowName = document.getElementById('flow-name').value || 'flow';
           if (!lastSavedConfigId) {
-            logStatus('activate: save draft first');
+            document.getElementById('flow-message').textContent = 'Save draft before activate.';
             return;
           }
           const res = await callApi('/api/configs/activate', {
@@ -1151,6 +1156,7 @@
           lastSavedVersion = res.active.version;
           lastSavedConfigId = res.active.config_id;
           activeVersion = res.active.version;
+          lastSavedAt = new Date().toLocaleTimeString();
           loadFlowConfig(res.active.config_json || {});
         } catch (error) {
           logStatus('flow load active error', { error: error.message });
@@ -1181,6 +1187,7 @@
           lastSavedVersion = previous.version;
           lastSavedConfigId = previous.id;
           lastSavedJson = JSON.stringify(previous.config_json || {}, null, 2);
+          lastSavedAt = new Date().toLocaleTimeString();
           loadFlowConfig(previous.config_json || {});
           logStatus('flow rollback', act);
         } catch (error) {
