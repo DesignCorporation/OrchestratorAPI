@@ -142,6 +142,12 @@
         opacity: 0.8;
       }
 
+      .edges {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
       .node {
         position: absolute;
         min-width: 180px;
@@ -166,6 +172,30 @@
       .node-meta {
         font-size: 12px;
         color: var(--muted);
+      }
+
+      .port {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        border: 2px solid #c7cfe4;
+        background: #fff;
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+
+      .port.out {
+        right: -8px;
+      }
+
+      .port.in {
+        left: -8px;
+      }
+
+      .port.active {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
       }
 
       .inspector h3 {
@@ -245,7 +275,9 @@
             <button class="secondary" onclick="location.href='/'">Back to Console</button>
           </div>
         </div>
-        <div class="canvas" id="canvas"></div>
+        <div class="canvas" id="canvas">
+          <svg class="edges" id="edges"></svg>
+        </div>
       </main>
 
       <aside class="inspector">
@@ -278,6 +310,7 @@
 
     <script>
       const canvas = document.getElementById('canvas');
+      const edgesSvg = document.getElementById('edges');
       const inspectEmpty = document.getElementById('inspect-empty');
       const inspectForm = document.getElementById('inspect-form');
       const nodeTitle = document.getElementById('node-title');
@@ -285,7 +318,9 @@
       const nodeEndpoint = document.getElementById('node-endpoint');
       const nodeNotes = document.getElementById('node-notes');
       const nodes = [];
+      const edges = [];
       let activeNode = null;
+      let pendingConnection = null;
 
       function createNode({ title, type, endpoint }) {
         const node = document.createElement('div');
@@ -299,14 +334,25 @@
         node.innerHTML = `
           <div class="node-title">${title}</div>
           <div class="node-meta">${endpoint || 'no endpoint'}</div>
+          <div class="port in" title="input"></div>
+          <div class="port out" title="output"></div>
         `;
 
         node.addEventListener('mousedown', startDrag);
         node.addEventListener('click', () => selectNode(node));
+        node.querySelector('.port.out').addEventListener('click', (event) => {
+          event.stopPropagation();
+          beginConnection(node);
+        });
+        node.querySelector('.port.in').addEventListener('click', (event) => {
+          event.stopPropagation();
+          completeConnection(node);
+        });
 
         canvas.appendChild(node);
         nodes.push(node);
         selectNode(node);
+        renderEdges();
       }
 
       function selectNode(node) {
@@ -328,6 +374,7 @@
         activeNode.dataset.notes = nodeNotes.value;
         activeNode.querySelector('.node-title').textContent = nodeTitle.value;
         activeNode.querySelector('.node-meta').textContent = nodeEndpoint.value || 'no endpoint';
+        renderEdges();
       }
 
       [nodeTitle, nodeType, nodeEndpoint, nodeNotes].forEach((el) =>
@@ -342,6 +389,7 @@
         function onMove(e) {
           node.style.left = `${e.clientX - startX}px`;
           node.style.top = `${e.clientY - startY}px`;
+          renderEdges();
         }
 
         function onUp() {
@@ -351,6 +399,45 @@
 
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
+      }
+
+      function beginConnection(node) {
+        pendingConnection = node;
+        node.querySelector('.port.out').classList.add('active');
+      }
+
+      function completeConnection(targetNode) {
+        if (!pendingConnection || pendingConnection === targetNode) return;
+        edges.push({ from: pendingConnection, to: targetNode });
+        pendingConnection.querySelector('.port.out').classList.remove('active');
+        pendingConnection = null;
+        renderEdges();
+      }
+
+      function renderEdges() {
+        const rect = canvas.getBoundingClientRect();
+        edgesSvg.setAttribute('width', rect.width);
+        edgesSvg.setAttribute('height', rect.height);
+        edgesSvg.innerHTML = '';
+        edges.forEach((edge) => {
+          const from = edge.from.getBoundingClientRect();
+          const to = edge.to.getBoundingClientRect();
+          const startX = from.right - rect.left;
+          const startY = from.top - rect.top + from.height / 2;
+          const endX = to.left - rect.left;
+          const endY = to.top - rect.top + to.height / 2;
+          const midX = (startX + endX) / 2;
+
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute(
+            'd',
+            `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`
+          );
+          path.setAttribute('fill', 'none');
+          path.setAttribute('stroke', '#6366f1');
+          path.setAttribute('stroke-width', '2');
+          edgesSvg.appendChild(path);
+        });
       }
 
       document.getElementById('add-api').addEventListener('click', () =>
@@ -365,6 +452,8 @@
       document.getElementById('reset').addEventListener('click', () => {
         nodes.forEach((node) => node.remove());
         nodes.length = 0;
+        edges.length = 0;
+        edgesSvg.innerHTML = '';
         activeNode = null;
         inspectForm.style.display = 'none';
         inspectEmpty.style.display = 'block';
