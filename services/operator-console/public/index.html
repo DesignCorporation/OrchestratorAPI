@@ -443,14 +443,22 @@
           Orchestrator
         </div>
         <div class="menu">
-          <button id="add-api">Add API block</button>
-          <button id="add-policy">Add Policy block</button>
-          <button id="add-webhook">Add Webhook block</button>
-          <button id="add-workspace">Add Workspace block</button>
-          <button id="reset">Reset canvas</button>
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em;">Projects</div>
+          <button id="ws-list-load">Load workspaces</button>
+          <div id="ws-list-mini" class="list"></div>
+        </div>
+        <div class="menu">
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em;">Add block</div>
+          <button id="add-api">API block</button>
+          <button id="add-policy">Policy block</button>
+          <button id="add-webhook">Webhook block</button>
+          <button id="add-workspace">Workspace block</button>
+          <button id="add-config">Config block</button>
+          <button id="add-dlq">DLQ block</button>
+          <button id="reset" class="danger">Reset canvas</button>
         </div>
         <p class="muted">
-          Canvas‑режим: связываем блоки интеграций, политику и webhooks.
+          Слева проекты, справа — настройки выбранного блока. Канвас пустой по умолчанию.
         </p>
         <div class="sidebar-footer">
           Operator Console · buildOS
@@ -800,6 +808,8 @@
       const wsCreate = document.getElementById('ws-create');
       const wsLoad = document.getElementById('ws-load');
       const wsList = document.getElementById('ws-list');
+      const wsListMini = document.getElementById('ws-list-mini');
+      const wsListLoad = document.getElementById('ws-list-load');
       const bundleReason = document.getElementById('bundle-reason');
       const bundleJson = document.getElementById('bundle-json');
       const bundleExport = document.getElementById('bundle-export');
@@ -975,6 +985,12 @@
       document.getElementById('add-workspace').addEventListener('click', () =>
         createNode({ title: 'Workspace', type: 'workspace', endpoint: 'buildos-dev', panel: 'panel-workspaces' })
       );
+      document.getElementById('add-config').addEventListener('click', () =>
+        createNode({ title: 'Config', type: 'config', endpoint: '/configs', panel: 'panel-configs' })
+      );
+      document.getElementById('add-dlq').addEventListener('click', () =>
+        createNode({ title: 'DLQ', type: 'dlq', endpoint: '/admin/dlq', panel: 'panel-dlq' })
+      );
       document.getElementById('reset').addEventListener('click', () => {
         nodes.forEach((node) => node.remove());
         nodes.length = 0;
@@ -985,18 +1001,6 @@
         inspectEmpty.style.display = 'block';
         showPanel('panel-overview');
       });
-
-      createNode({ title: 'Overview', type: 'workspace', endpoint: 'status', panel: 'panel-overview' });
-      createNode({ title: 'Workspaces', type: 'workspace', endpoint: 'POST /workspaces', panel: 'panel-workspaces' });
-      createNode({ title: 'Bundle', type: 'config', endpoint: '/bundle/import', panel: 'panel-bundle' });
-      createNode({ title: 'Happy Path', type: 'api', endpoint: '/execute', panel: 'panel-happy-path' });
-      createNode({ title: 'Configs', type: 'config', endpoint: '/configs', panel: 'panel-configs' });
-      createNode({ title: 'Policies', type: 'policy', endpoint: '/policies', panel: 'panel-policies' });
-      createNode({ title: 'Connectors', type: 'api', endpoint: '/connectors', panel: 'panel-connectors' });
-      createNode({ title: 'Webhooks', type: 'webhook', endpoint: '/webhooks/stripe', panel: 'panel-webhooks' });
-      createNode({ title: 'DLQ', type: 'dlq', endpoint: '/admin/dlq', panel: 'panel-dlq' });
-      createNode({ title: 'Audit', type: 'api', endpoint: '/audit-logs', panel: 'panel-audit' });
-      createNode({ title: 'Events', type: 'api', endpoint: '/events/stream', panel: 'panel-events' });
 
       function addEvent(data) {
         const li = document.createElement('li');
@@ -1430,6 +1434,18 @@
           });
         } catch (error) {
           logStatus('load workspaces ошибка', { error: error.message });
+        }
+      });
+
+      wsListLoad.addEventListener('click', async () => {
+        try {
+          const res = await callApi('/api/workspaces');
+          renderList(wsListMini, res.workspaces || [], (ws) => {
+            const status = ws.status === 'active' ? 'success' : 'danger';
+            return `<div><strong>${ws.name}</strong> <span class="badge ${status}">${ws.env}</span></div>`;
+          });
+        } catch (error) {
+          logStatus('workspace list ошибка', { error: error.message });
         }
       });
 
