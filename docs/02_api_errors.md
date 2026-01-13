@@ -42,6 +42,7 @@ All error responses use the same JSON shape:
 - `config_not_active`
 - `missing_type_or_name`
 - `missing_provider_ref_or_reason`
+- `missing_provider_or_ref`
 - `missing_name_or_reason`
 - `missing_name_or_env`
 - `invalid_env`
@@ -61,6 +62,17 @@ All error responses use the same JSON shape:
 - `missing_reason`
 - `invalid_impersonate_sub`
 - `invalid_impersonate_tenant`
+- `bundle_invalid_payload`
+- `missing_config_json`
+- `missing_name_or_config_id`
+- `invalid_secret_ref_id`
+- `invalid_policy_id`
+- `policy_not_found`
+- `secret_ref_not_found`
+- `policy_insert_failed`
+- `secret_ref_insert_failed`
+- `connector_insert_failed`
+- `config_insert_failed`
 - `upstream_timeout`
 - `internal_error`
 - `request_error`

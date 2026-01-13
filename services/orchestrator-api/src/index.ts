@@ -1737,6 +1737,326 @@ function registerRoutes() {
     return reply.status(200).send({ active: result.rows[0] });
   });
 
+  app.get('/bundle/export', async (request, reply) => {
+    if (!requireScope(request, 'orchestrator.control.read')) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 403, 'forbidden', 'forbidden');
+    }
+    if (!pgPool) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 500, 'db_not_configured', 'db_not_configured');
+    }
+
+    const tenantId = getTenantId(request);
+    const [policies, connectors, secretRefs, configs, configPointers] = await Promise.all([
+      pgPool.query('SELECT * FROM policy WHERE tenant_id = $1 ORDER BY created_at DESC', [tenantId]),
+      pgPool.query('SELECT * FROM connector WHERE tenant_id = $1 ORDER BY created_at DESC', [tenantId]),
+      pgPool.query('SELECT * FROM secret_ref WHERE tenant_id = $1 ORDER BY created_at DESC', [tenantId]),
+      pgPool.query('SELECT * FROM orchestrator_config WHERE tenant_id = $1 ORDER BY created_at DESC', [tenantId]),
+      pgPool.query('SELECT * FROM config_pointer WHERE tenant_id = $1', [tenantId])
+    ]);
+
+    const operatorId = request.user?.sub && isUuid(request.user.sub) ? request.user.sub : defaultTenantId;
+    await logAudit({
+      operatorId,
+      action: 'bundle.export',
+      resourceType: 'bundle',
+      resourceId: tenantId,
+      diff: { policies: policies.rowCount, connectors: connectors.rowCount, secret_refs: secretRefs.rowCount },
+      reason: 'bundle export'
+    });
+
+    return reply.status(200).send({
+      policies: policies.rows,
+      connectors: connectors.rows,
+      secret_refs: secretRefs.rows,
+      configs: configs.rows,
+      config_pointers: configPointers.rows
+    });
+  });
+
+  app.post('/bundle/import', async (request, reply) => {
+    if (!requireScope(request, 'orchestrator.control.write')) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 403, 'forbidden', 'forbidden');
+    }
+    if (!pgPool) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 500, 'db_not_configured', 'db_not_configured');
+    }
+
+    const body = request.body as {
+      reason?: string;
+      policies?: Array<Record<string, unknown>>;
+      connectors?: Array<Record<string, unknown>>;
+      secret_refs?: Array<Record<string, unknown>>;
+      configs?: Array<Record<string, unknown>>;
+      config_pointers?: Array<Record<string, unknown>>;
+    };
+    if (!body || typeof body !== 'object') {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 400, 'bundle_invalid_payload', 'bundle_invalid_payload');
+    }
+    if (!body.reason) {
+      return sendError(reply, request as { headers: Record<string, unknown> }, 400, 'missing_reason', 'missing_reason');
+    }
+
+    const tenantId = getTenantId(request);
+    const operatorId = request.user?.sub && isUuid(request.user.sub) ? request.user.sub : defaultTenantId;
+    const report = {
+      status: 'ok' as 'ok' | 'partial',
+      imported: { policies: 0, connectors: 0, secret_refs: 0, configs: 0, config_pointers: 0 },
+      skipped: { policies: 0, connectors: 0, secret_refs: 0, configs: 0, config_pointers: 0 },
+      errors: [] as Array<{ entity: string; index: number; code: string; message: string }>
+    };
+
+    const addError = (entity: string, index: number, code: string, message: string) => {
+      report.errors.push({ entity, index, code, message });
+    };
+
+    const policies = Array.isArray(body.policies) ? body.policies : [];
+    for (let i = 0; i < policies.length; i += 1) {
+      const item = policies[i];
+      const name = typeof item.name === 'string' ? item.name : null;
+      if (!name) {
+        addError('policy', i, 'missing_name', 'missing_name');
+        continue;
+      }
+      const policyId = typeof item.id === 'string' && isUuid(item.id) ? item.id : randomUUID();
+      try {
+        await pgPool.query(
+          `INSERT INTO policy (id, tenant_id, name, rate_limit_json, retry_json, timeout_json, circuit_breaker_json, concurrency_json)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            policyId,
+            tenantId,
+            name,
+            asObject(item.rate_limit_json),
+            asObject(item.retry_json),
+            asObject(item.timeout_json),
+            asObject(item.circuit_breaker_json),
+            asObject(item.concurrency_json)
+          ]
+        );
+        report.imported.policies += 1;
+        await logAudit({
+          operatorId,
+          action: 'policy.create',
+          resourceType: 'policy',
+          resourceId: policyId,
+          diff: { name },
+          reason: body.reason
+        });
+      } catch (error) {
+        report.skipped.policies += 1;
+        addError('policy', i, 'policy_insert_failed', 'policy_insert_failed');
+      }
+    }
+
+    const secretRefs = Array.isArray(body.secret_refs) ? body.secret_refs : [];
+    for (let i = 0; i < secretRefs.length; i += 1) {
+      const item = secretRefs[i];
+      const provider = typeof item.provider === 'string' ? item.provider : null;
+      const ref = typeof item.ref === 'string' ? item.ref : null;
+      if (!provider || !ref) {
+        addError('secret_ref', i, 'missing_provider_or_ref', 'missing_provider_or_ref');
+        continue;
+      }
+      const secretId = typeof item.id === 'string' && isUuid(item.id) ? item.id : randomUUID();
+      try {
+        await pgPool.query(
+          `INSERT INTO secret_ref (id, tenant_id, provider, ref, version)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [secretId, tenantId, provider, ref, typeof item.version === 'string' ? item.version : null]
+        );
+        report.imported.secret_refs += 1;
+        await logAudit({
+          operatorId,
+          action: 'secret_ref.create',
+          resourceType: 'secret_ref',
+          resourceId: secretId,
+          diff: { provider, ref },
+          reason: body.reason
+        });
+      } catch (error) {
+        if ((error as { code?: string })?.code === '23505') {
+          report.skipped.secret_refs += 1;
+          continue;
+        }
+        report.skipped.secret_refs += 1;
+        addError('secret_ref', i, 'secret_ref_insert_failed', 'secret_ref_insert_failed');
+      }
+    }
+
+    const connectors = Array.isArray(body.connectors) ? body.connectors : [];
+    for (let i = 0; i < connectors.length; i += 1) {
+      const item = connectors[i];
+      const type = typeof item.type === 'string' ? item.type : null;
+      const name = typeof item.name === 'string' ? item.name : null;
+      if (!type || !name) {
+        addError('connector', i, 'missing_type_or_name', 'missing_type_or_name');
+        continue;
+      }
+      const secretRefId =
+        typeof item.secret_ref_id === 'string' && isUuid(item.secret_ref_id) ? item.secret_ref_id : null;
+      const policyId = typeof item.policy_id === 'string' && isUuid(item.policy_id) ? item.policy_id : null;
+      if (item.secret_ref_id && !secretRefId) {
+        addError('connector', i, 'invalid_secret_ref_id', 'invalid_secret_ref_id');
+        continue;
+      }
+      if (item.policy_id && !policyId) {
+        addError('connector', i, 'invalid_policy_id', 'invalid_policy_id');
+        continue;
+      }
+      if (policyId) {
+        const policyRes = await pgPool.query('SELECT id FROM policy WHERE id = $1 AND tenant_id = $2', [
+          policyId,
+          tenantId
+        ]);
+        if ((policyRes.rowCount ?? 0) === 0) {
+          addError('connector', i, 'policy_not_found', 'policy_not_found');
+          continue;
+        }
+      }
+      if (secretRefId) {
+        const secretRes = await pgPool.query('SELECT id FROM secret_ref WHERE id = $1 AND tenant_id = $2', [
+          secretRefId,
+          tenantId
+        ]);
+        if ((secretRes.rowCount ?? 0) === 0) {
+          addError('connector', i, 'secret_ref_not_found', 'secret_ref_not_found');
+          continue;
+        }
+      }
+      const connectorId = typeof item.id === 'string' && isUuid(item.id) ? item.id : randomUUID();
+      try {
+        await pgPool.query(
+          `INSERT INTO connector (id, tenant_id, type, name, status, settings_json, secret_ref_id, policy_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            connectorId,
+            tenantId,
+            type,
+            name,
+            typeof item.status === 'string' ? item.status : 'active',
+            asObject(item.settings),
+            secretRefId,
+            policyId
+          ]
+        );
+        report.imported.connectors += 1;
+        await logAudit({
+          operatorId,
+          action: 'connector.create',
+          resourceType: 'connector',
+          resourceId: connectorId,
+          diff: { type, name },
+          reason: body.reason
+        });
+      } catch (error) {
+        if ((error as { code?: string })?.code === '23505') {
+          report.skipped.connectors += 1;
+          continue;
+        }
+        report.skipped.connectors += 1;
+        addError('connector', i, 'connector_insert_failed', 'connector_insert_failed');
+      }
+    }
+
+    const configs = Array.isArray(body.configs) ? body.configs : [];
+    for (let i = 0; i < configs.length; i += 1) {
+      const item = configs[i];
+      const name = typeof item.name === 'string' ? item.name : null;
+      if (!name) {
+        addError('config', i, 'missing_name', 'missing_name');
+        continue;
+      }
+      const hasConfig = Object.prototype.hasOwnProperty.call(item, 'config_json');
+      if (!hasConfig) {
+        addError('config', i, 'missing_config_json', 'missing_config_json');
+        continue;
+      }
+      const configJson = asObject(item.config_json);
+      const configId = typeof item.id === 'string' && isUuid(item.id) ? item.id : randomUUID();
+      let version = typeof item.version === 'number' ? item.version : null;
+      if (!version || !Number.isFinite(version)) {
+        const versionRes = await pgPool.query(
+          `SELECT COALESCE(MAX(version), 0) + 1 AS next_version FROM orchestrator_config WHERE tenant_id = $1 AND name = $2`,
+          [tenantId, name]
+        );
+        version = Number(versionRes.rows[0]?.next_version || 1);
+      }
+      try {
+        await pgPool.query(
+          `INSERT INTO orchestrator_config (id, tenant_id, name, version, config_json)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [configId, tenantId, name, version, configJson]
+        );
+        report.imported.configs += 1;
+        await logAudit({
+          operatorId,
+          action: 'config.create',
+          resourceType: 'orchestrator_config',
+          resourceId: configId,
+          diff: { name, version },
+          reason: body.reason
+        });
+      } catch (error) {
+        if ((error as { code?: string })?.code === '23505') {
+          report.skipped.configs += 1;
+          continue;
+        }
+        report.skipped.configs += 1;
+        addError('config', i, 'config_insert_failed', 'config_insert_failed');
+      }
+    }
+
+    const pointers = Array.isArray(body.config_pointers) ? body.config_pointers : [];
+    for (let i = 0; i < pointers.length; i += 1) {
+      const item = pointers[i];
+      const name = typeof item.name === 'string' ? item.name : null;
+      const configId = typeof item.config_id === 'string' && isUuid(item.config_id) ? item.config_id : null;
+      if (!name || !configId) {
+        addError('config_pointer', i, 'missing_name_or_config_id', 'missing_name_or_config_id');
+        continue;
+      }
+      const configRes = await pgPool.query(
+        'SELECT id FROM orchestrator_config WHERE id = $1 AND tenant_id = $2',
+        [configId, tenantId]
+      );
+      if ((configRes.rowCount ?? 0) === 0) {
+        addError('config_pointer', i, 'config_not_found', 'config_not_found');
+        continue;
+      }
+      await pgPool.query(
+        `INSERT INTO config_pointer (tenant_id, name, config_id)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (tenant_id, name)
+         DO UPDATE SET config_id = EXCLUDED.config_id, updated_at = now()`,
+        [tenantId, name, configId]
+      );
+      report.imported.config_pointers += 1;
+      await logAudit({
+        operatorId,
+        action: 'config.activate',
+        resourceType: 'config_pointer',
+        resourceId: configId,
+        diff: { name },
+        reason: body.reason
+      });
+    }
+
+    if (report.errors.length > 0) {
+      report.status = 'partial';
+    }
+
+    await logAudit({
+      operatorId,
+      action: 'bundle.import',
+      resourceType: 'bundle',
+      resourceId: tenantId,
+      diff: report,
+      reason: body.reason
+    });
+
+    return reply.status(200).send(report);
+  });
+
   app.post('/connectors', async (request, reply) => {
     if (!requireScope(request, 'orchestrator.control.write')) {
       return sendError(reply, request as { headers: Record<string, unknown> }, 403, 'forbidden', 'forbidden');
@@ -1980,7 +2300,8 @@ async function start() {
         pathname.startsWith('/events') ||
         pathname.startsWith('/webhooks') ||
         pathname.startsWith('/metrics') ||
-        pathname.startsWith('/workspaces')
+        pathname.startsWith('/workspaces') ||
+        pathname.startsWith('/bundle')
       )
     ) {
       return sendError(reply, request as { headers: Record<string, unknown> }, 404, 'not_found', 'not_found');

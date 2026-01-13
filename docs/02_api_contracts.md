@@ -110,6 +110,57 @@
 }
 ```
 
+## `GET /bundle/export` (control)
+
+**Назначение:** экспортировать текущие сущности workspace в JSON bundle.
+
+**Response**
+```json
+{
+  "policies": [],
+  "connectors": [],
+  "secret_refs": [],
+  "configs": [],
+  "config_pointers": []
+}
+```
+
+## `POST /bundle/import` (control)
+
+**Назначение:** импортировать JSON bundle в workspace.
+
+**Request**
+```json
+{
+  "reason": "initial onboarding",
+  "policies": [
+    {"id": "uuid", "name": "default", "retry_json": {"max_attempts": 3}}
+  ],
+  "secret_refs": [
+    {"id": "uuid", "provider": "env", "ref": "env://STRIPE_KEY"}
+  ],
+  "connectors": [
+    {"id": "uuid", "type": "http", "name": "stripe", "policy_id": "uuid"}
+  ],
+  "configs": [
+    {"id": "uuid", "name": "feature_flags", "version": 1, "config_json": {"demo": true}}
+  ],
+  "config_pointers": [
+    {"name": "feature_flags", "config_id": "uuid"}
+  ]
+}
+```
+
+**Response**
+```json
+{
+  "status": "ok",
+  "imported": {"policies": 1, "connectors": 1, "secret_refs": 1, "configs": 1, "config_pointers": 1},
+  "skipped": {"policies": 0, "connectors": 0, "secret_refs": 0, "configs": 0, "config_pointers": 0},
+  "errors": []
+}
+```
+
 **Response 200**
 ```json
 {
