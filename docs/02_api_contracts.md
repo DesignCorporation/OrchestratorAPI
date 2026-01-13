@@ -268,6 +268,10 @@
 - `duplicate: true`
 - повторно job не enqueue
 
+**Routing**
+- account_id берётся из payload/headers провайдера.
+- если account_id отсутствует, используется значение `default` и должен существовать route `provider + default`.
+
 ## `POST /webhook-routes` (control)
 
 **Назначение:** создать webhook route (provider + account_id → workspace).
