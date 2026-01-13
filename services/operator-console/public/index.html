@@ -15,9 +15,6 @@
         --muted: #667085;
         --accent: #111827;
         --accent-soft: #eef1f8;
-        --success: #16a34a;
-        --warning: #f59e0b;
-        --danger: #ef4444;
         --shadow: 0 2px 8px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
         --radius: 16px;
         --radius-sm: 12px;
@@ -41,31 +38,31 @@
 
       .app {
         display: grid;
-        grid-template-columns: 260px 1fr;
+        grid-template-columns: 240px 1fr 360px;
         min-height: 100vh;
       }
 
       .sidebar {
         background: var(--sidebar);
         border-right: 1px solid var(--border);
-        padding: 24px 18px;
+        padding: 20px 18px;
         display: flex;
         flex-direction: column;
-        gap: 24px;
+        gap: 20px;
       }
 
       .brand {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
         font-weight: 600;
-        font-size: 18px;
+        font-size: 16px;
       }
 
       .brand-badge {
-        width: 34px;
-        height: 34px;
-        border-radius: 10px;
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
         background: var(--accent);
         color: #fff;
         display: grid;
@@ -73,75 +70,50 @@
         font-weight: 700;
       }
 
-      .nav {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
+      .menu {
+        display: grid;
+        gap: 8px;
+        font-size: 13px;
       }
 
-      .nav a {
+      .menu button {
+        border: 1px solid var(--border);
+        background: #fff;
         padding: 10px 12px;
         border-radius: 10px;
-        color: var(--muted);
-        font-size: 14px;
-      }
-
-      .nav a:hover,
-      .nav a.active {
-        background: #ffffff;
-        color: var(--text);
-        box-shadow: var(--shadow);
-      }
-
-      .sidebar-group {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-
-      .sidebar-label {
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #98a2b3;
+        cursor: pointer;
+        text-align: left;
       }
 
       .sidebar-footer {
         margin-top: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-        font-size: 13px;
+        font-size: 12px;
         color: var(--muted);
       }
 
       .content {
-        padding: 28px 32px 40px;
+        padding: 18px 20px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
       }
 
       .topbar {
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        gap: 16px;
-        margin-bottom: 24px;
+        justify-content: space-between;
+        gap: 12px;
       }
 
       .topbar h1 {
         margin: 0;
-        font-size: 24px;
-        font-weight: 600;
+        font-size: 20px;
       }
 
       .topbar p {
         margin: 4px 0 0;
         color: var(--muted);
-      }
-
-      .top-actions {
-        display: flex;
-        gap: 12px;
-        align-items: center;
+        font-size: 13px;
       }
 
       .workspace-switch {
@@ -149,7 +121,7 @@
         border: 1px solid var(--border);
         border-radius: 12px;
         padding: 10px 12px;
-        min-width: 200px;
+        min-width: 220px;
       }
 
       .workspace-switch label {
@@ -168,35 +140,118 @@
         color: var(--text);
       }
 
-      .grid {
-        display: grid;
-        gap: 20px;
+      .canvas {
+        position: relative;
+        flex: 1;
+        background: #fff;
+        border: 1px dashed #d8dbe7;
+        border-radius: var(--radius);
+        min-height: 620px;
+        overflow: hidden;
       }
 
-      .grid-2 {
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      .canvas::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(#e6e9f2 1px, transparent 1px);
+        background-size: 16px 16px;
+        opacity: 0.8;
       }
 
-      .grid-3 {
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      .edges {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
       }
 
-      .card {
+      .node {
+        position: absolute;
+        min-width: 180px;
+        padding: 12px;
         background: var(--panel);
         border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 18px;
+        border-radius: 12px;
         box-shadow: var(--shadow);
+        cursor: grab;
       }
 
-      .card h3 {
-        margin: 0 0 6px;
+      .node.selected {
+        outline: 2px solid #6366f1;
+      }
+
+      .node-title {
+        font-weight: 600;
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+
+      .node-meta {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .port {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        border: 2px solid #c7cfe4;
+        background: #fff;
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+
+      .port.out {
+        right: -8px;
+      }
+
+      .port.in {
+        left: -8px;
+      }
+
+      .port.active {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+      }
+
+      .inspector {
+        background: var(--sidebar);
+        border-left: 1px solid var(--border);
+        padding: 20px;
+        overflow: auto;
+      }
+
+      .inspector h3 {
+        margin: 0 0 8px;
         font-size: 16px;
       }
 
-      .muted {
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 12px;
+      }
+
+      label {
+        font-size: 12px;
         color: var(--muted);
+      }
+
+      input,
+      textarea,
+      select {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px 12px;
         font-size: 13px;
+        font-family: inherit;
+      }
+
+      textarea {
+        min-height: 110px;
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
       }
 
       .toolbar {
@@ -204,11 +259,6 @@
         gap: 10px;
         flex-wrap: wrap;
         margin-top: 12px;
-      }
-
-      .stack {
-        flex-direction: column;
-        align-items: stretch;
       }
 
       button {
@@ -233,33 +283,39 @@
         border: 1px solid #fda4af;
       }
 
-      input,
-      textarea {
-        border-radius: 10px;
+      .panel {
+        display: none;
+        background: var(--panel);
         border: 1px solid var(--border);
-        padding: 10px 12px;
-        font-size: 13px;
-        font-family: inherit;
-        background: #fff;
+        border-radius: var(--radius);
+        padding: 16px;
+        margin-top: 16px;
+        box-shadow: var(--shadow);
       }
 
-      textarea {
-        width: 100%;
-        min-height: 120px;
+      .panel.active {
+        display: block;
+      }
+
+      .panel h4 {
+        margin: 0 0 6px;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .status {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 12px;
+        background: #0b1220;
+        color: #e2e8f0;
         font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
         font-size: 12px;
-      }
-
-      .fields {
-        display: grid;
-        gap: 12px;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      }
-
-      .field label {
-        font-size: 12px;
-        color: var(--muted);
-        margin-bottom: 6px;
+        max-height: 180px;
+        overflow: auto;
       }
 
       .list {
@@ -331,53 +387,6 @@
         color: #b42318;
       }
 
-      .status {
-        margin-top: 12px;
-        padding: 12px;
-        border-radius: 12px;
-        background: #0b1220;
-        color: #e2e8f0;
-        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-        font-size: 12px;
-        max-height: 180px;
-        overflow: auto;
-      }
-
-      ul#events {
-        list-style: none;
-        padding: 0;
-        margin: 12px 0 0;
-      }
-
-      ul#events li {
-        background: #f8fafc;
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 10px 12px;
-        margin-bottom: 8px;
-        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-        font-size: 12px;
-      }
-
-      .section {
-        display: grid;
-        gap: 16px;
-      }
-
-      .section-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      }
-
-      .pill {
-        background: var(--accent-soft);
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-size: 12px;
-        color: var(--muted);
-      }
-
       .modal {
         position: fixed;
         inset: 0;
@@ -411,27 +420,17 @@
         justify-content: flex-end;
       }
 
-      @media (max-width: 1024px) {
+      @media (max-width: 1200px) {
         .app {
           grid-template-columns: 1fr;
         }
         .sidebar {
-          position: sticky;
-          top: 0;
-          flex-direction: row;
-          flex-wrap: wrap;
           border-right: none;
           border-bottom: 1px solid var(--border);
         }
-      }
-
-      @media (max-width: 768px) {
-        .content {
-          padding: 20px;
-        }
-        .topbar {
-          flex-direction: column;
-          align-items: flex-start;
+        .inspector {
+          border-left: none;
+          border-top: 1px solid var(--border);
         }
       }
     </style>
@@ -443,392 +442,296 @@
           <span class="brand-badge">O</span>
           Orchestrator
         </div>
-        <nav class="nav">
-          <a class="active" href="#overview">Overview</a>
-          <a href="#workspaces">Workspaces</a>
-          <a href="#bundle">Bundle</a>
-          <a href="#happy-path">Happy Path</a>
-          <a href="#configs">Configs</a>
-          <a href="#policies">Policies</a>
-          <a href="#connectors">Connectors</a>
-          <a href="/canvas-demo.html">Canvas Demo</a>
-          <a href="#webhooks">Webhooks</a>
-          <a href="#dlq">DLQ</a>
-          <a href="#audit">Audit</a>
-        </nav>
-        <div class="sidebar-group">
-          <div class="sidebar-label">Support</div>
-          <a href="#audit">Audit logs</a>
-          <a href="#events">Events stream</a>
+        <div class="menu">
+          <button id="add-api">Add API block</button>
+          <button id="add-policy">Add Policy block</button>
+          <button id="add-webhook">Add Webhook block</button>
+          <button id="add-workspace">Add Workspace block</button>
+          <button id="reset">Reset canvas</button>
         </div>
+        <p class="muted">
+          Canvas‑режим: связываем блоки интеграций, политику и webhooks.
+        </p>
         <div class="sidebar-footer">
-          <div>Support · Changelog</div>
-          <div>Erica · operator@designcorp.eu</div>
+          Operator Console · buildOS
         </div>
       </aside>
-      <div class="content">
-        <header class="topbar">
+
+      <main class="content">
+        <div class="topbar">
           <div>
-            <h1>Operator Console</h1>
-            <p>Единая панель управления интеграциями, webhooks и надёжностью.</p>
+            <h1>Workspace Flow</h1>
+            <p>Drag & connect blocks. Click a block to edit.</p>
           </div>
-          <div class="top-actions">
-            <div class="workspace-switch">
-              <label>Workspace</label>
-              <select>
-                <option>buildos-dev</option>
-                <option>buildos-prod</option>
-                <option>beauty-dev</option>
-              </select>
-            </div>
+          <div class="workspace-switch">
+            <label>Workspace</label>
+            <select>
+              <option>buildos-dev</option>
+              <option>buildos-prod</option>
+              <option>beauty-dev</option>
+            </select>
           </div>
-        </header>
+        </div>
+        <div class="canvas" id="canvas">
+          <svg class="edges" id="edges"></svg>
+        </div>
+      </main>
 
-        <section id="overview" class="section">
-          <div class="section-header">
-            <h2>Overview</h2>
-            <span class="pill">Last 24 hours</span>
+      <aside class="inspector">
+        <h3>Node Inspector</h3>
+        <div class="muted" id="inspect-empty">Select a block on the canvas.</div>
+        <div id="inspect-form" style="display:none;">
+          <div class="field">
+            <label>Title</label>
+            <input id="node-title" />
           </div>
-          <div class="grid grid-3">
-            <div class="card">
-              <h3>Queue depth</h3>
-              <div style="font-size: 28px; font-weight: 600;">12</div>
-              <div class="muted">across default + webhook</div>
-            </div>
-            <div class="card">
-              <h3>Webhooks received</h3>
-              <div style="font-size: 28px; font-weight: 600;">86</div>
-              <div class="muted">+12% vs вчера</div>
-            </div>
-            <div class="card">
-              <h3>Errors</h3>
-              <div style="font-size: 28px; font-weight: 600;">3</div>
-              <div class="muted">last 24h</div>
-            </div>
+          <div class="field">
+            <label>Type</label>
+            <select id="node-type">
+              <option value="api">API</option>
+              <option value="policy">Policy</option>
+              <option value="webhook">Webhook</option>
+              <option value="workspace">Workspace</option>
+              <option value="config">Config</option>
+              <option value="dlq">DLQ</option>
+            </select>
           </div>
-        </section>
+          <div class="field">
+            <label>Endpoint / Details</label>
+            <input id="node-endpoint" />
+          </div>
+          <div class="field">
+            <label>Notes</label>
+            <textarea id="node-notes"></textarea>
+          </div>
+        </div>
 
-        <section id="onboarding" class="section">
-          <div class="section-header">
-            <h2>Onboarding</h2>
-            <span class="pill">Workspace setup</span>
+        <div id="panel-overview" class="panel active">
+          <h4>Overview</h4>
+          <div class="list">
+            <div class="list-item"><strong>Queue depth</strong> 12</div>
+            <div class="list-item"><strong>Webhooks received</strong> 86</div>
+            <div class="list-item"><strong>Errors</strong> 3</div>
           </div>
-          <div class="card">
-            <div class="fields">
-              <div class="field">
-                <label>Step 1</label>
-                <div class="badge">Create workspace</div>
-                <div class="muted">Заполни название, среду и invite.</div>
-              </div>
-              <div class="field">
-                <label>Step 2</label>
-                <div class="badge success">Import bundle</div>
-                <div class="muted">Policies, connectors, configs.</div>
-              </div>
-              <div class="field">
-                <label>Step 3</label>
-                <div class="badge warn">Test execute</div>
-                <div class="muted">Проверь happy‑path и события.</div>
-              </div>
-            </div>
-            <div class="toolbar">
-              <a href="#workspaces"><button>Create workspace</button></a>
-              <a href="#bundle"><button class="secondary">Import bundle</button></a>
-              <a href="#happy-path"><button class="secondary">Run execute</button></a>
-            </div>
-          </div>
-        </section>
+        </div>
 
-        <section id="workspaces" class="section">
-          <div class="section-header">
-            <h2>Workspaces</h2>
-            <span class="pill">Invite-only</span>
+        <div id="panel-workspaces" class="panel">
+          <h4>Workspaces</h4>
+          <div class="field">
+            <label>Workspace name</label>
+            <input id="ws-name" value="buildos-dev" />
           </div>
-          <div class="card">
-            <div class="fields">
-              <div class="field">
-                <label>Workspace name</label>
-                <input id="ws-name" value="buildos-dev" />
-              </div>
-              <div class="field">
-                <label>Env</label>
-                <input id="ws-env" value="dev" />
-              </div>
-              <div class="field">
-                <label>Reason</label>
-                <input id="ws-reason" placeholder="reason" />
-              </div>
-              <div class="field">
-                <label>Invite TTL (hours)</label>
-                <input id="ws-invite-ttl" value="24" />
-              </div>
-              <div class="field">
-                <label>Invite max uses</label>
-                <input id="ws-invite-uses" value="1" />
-              </div>
-              <div class="field">
-                <label>Invite base URL (optional)</label>
-                <input id="ws-invite-base" placeholder="https://orch.designcorp.eu" />
-              </div>
-            </div>
-            <div class="toolbar">
-              <button id="ws-create">Create workspace</button>
-              <button id="ws-load" class="secondary">Load workspaces</button>
-            </div>
-            <div class="list" id="ws-list"></div>
+          <div class="field">
+            <label>Env</label>
+            <input id="ws-env" value="dev" />
           </div>
-        </section>
+          <div class="field">
+            <label>Reason</label>
+            <input id="ws-reason" placeholder="reason" />
+          </div>
+          <div class="field">
+            <label>Invite TTL (hours)</label>
+            <input id="ws-invite-ttl" value="24" />
+          </div>
+          <div class="field">
+            <label>Invite max uses</label>
+            <input id="ws-invite-uses" value="1" />
+          </div>
+          <div class="field">
+            <label>Invite base URL (optional)</label>
+            <input id="ws-invite-base" placeholder="https://orch.designcorp.eu" />
+          </div>
+          <div class="toolbar">
+            <button id="ws-create">Create workspace</button>
+            <button id="ws-load" class="secondary">Load workspaces</button>
+          </div>
+          <div class="list" id="ws-list"></div>
+        </div>
 
-        <section id="bundle" class="section">
-          <div class="section-header">
-            <h2>Bundle</h2>
-            <span class="pill">Import / Export</span>
+        <div id="panel-bundle" class="panel">
+          <h4>Bundle</h4>
+          <div class="field">
+            <label>Reason</label>
+            <input id="bundle-reason" placeholder="reason" />
           </div>
-          <div class="card">
-            <div class="fields">
-              <div class="field">
-                <label>Reason</label>
-                <input id="bundle-reason" placeholder="reason" />
-              </div>
-            </div>
-            <label class="muted">Bundle JSON</label>
-            <textarea id="bundle-json">{\n  "policies": [],\n  "connectors": [],\n  "secret_refs": [],\n  "configs": [],\n  "config_pointers": []\n}</textarea>
-            <div class="toolbar">
-              <button id="bundle-export" class="secondary">Load export</button>
-              <button id="bundle-import">Import bundle</button>
-            </div>
+          <label class="muted">Bundle JSON</label>
+          <textarea id="bundle-json">{\n  "policies": [],\n  "connectors": [],\n  "secret_refs": [],\n  "configs": [],\n  "config_pointers": []\n}</textarea>
+          <div class="toolbar">
+            <button id="bundle-export" class="secondary">Load export</button>
+            <button id="bundle-import">Import bundle</button>
           </div>
-        </section>
+        </div>
 
-        <section id="happy-path" class="section">
-          <div class="section-header">
-            <h2>Happy Path (demo)</h2>
-            <span class="pill">Execute test</span>
+        <div id="panel-happy-path" class="panel">
+          <h4>Happy Path (demo)</h4>
+          <div class="field">
+            <label>Connector name</label>
+            <input id="connector-name" value="demo-http" />
           </div>
-          <div class="grid grid-2">
-            <div class="card">
-              <div class="fields">
-                <div class="field">
-                  <label>Connector name</label>
-                  <input id="connector-name" value="demo-http" />
-                </div>
-                <div class="field">
-                  <label>Base URL</label>
-                  <input id="base-url" value="https://postman-echo.com" />
-                </div>
-                <div class="field">
-                  <label>Operation path</label>
-                  <input id="operation-path" value="/post" />
-                </div>
-              </div>
-              <div class="toolbar">
-                <button id="setup-demo">Create policy + connector</button>
-                <button id="run-execute" class="secondary">Run execute</button>
-              </div>
-            </div>
-            <div class="card">
-              <h3>Status</h3>
-              <p class="muted">Результаты демо‑операций и ошибок.</p>
-              <div class="status" id="status"></div>
-            </div>
+          <div class="field">
+            <label>Base URL</label>
+            <input id="base-url" value="https://postman-echo.com" />
           </div>
-        </section>
+          <div class="field">
+            <label>Operation path</label>
+            <input id="operation-path" value="/post" />
+          </div>
+          <div class="toolbar">
+            <button id="setup-demo">Create policy + connector</button>
+            <button id="run-execute" class="secondary">Run execute</button>
+          </div>
+          <div class="status" id="status"></div>
+        </div>
 
-        <section id="configs" class="section">
-          <div class="section-header">
-            <h2>Configs</h2>
-            <span class="pill">Versioned</span>
+        <div id="panel-configs" class="panel">
+          <h4>Configs</h4>
+          <div class="field">
+            <label>Config name</label>
+            <input id="cfg-name" value="demo-config" />
           </div>
-          <div class="card">
-            <div class="fields">
-              <div class="field">
-                <label>Config name</label>
-                <input id="cfg-name" value="demo-config" />
-              </div>
-              <div class="field">
-                <label>Reason</label>
-                <input id="cfg-reason" placeholder="reason" />
-              </div>
-            </div>
-            <label class="muted">Config JSON</label>
-            <textarea id="cfg-json">{\n  "version": 1,\n  "feature_flags": {"demo": true}\n}</textarea>
-            <div class="toolbar">
-              <button id="cfg-create">Create config</button>
-              <button id="cfg-load" class="secondary">Load history</button>
-              <button id="cfg-active" class="secondary">Show active</button>
-              <button id="cfg-rollback" class="secondary">Rollback</button>
-            </div>
-            <div class="list" id="cfg-list"></div>
-            <div class="list" id="cfg-active-view"></div>
+          <div class="field">
+            <label>Reason</label>
+            <input id="cfg-reason" placeholder="reason" />
           </div>
-        </section>
+          <label class="muted">Config JSON</label>
+          <textarea id="cfg-json">{\n  "version": 1,\n  "feature_flags": {"demo": true}\n}</textarea>
+          <div class="toolbar">
+            <button id="cfg-create">Create config</button>
+            <button id="cfg-load" class="secondary">Load history</button>
+            <button id="cfg-active" class="secondary">Show active</button>
+            <button id="cfg-rollback" class="secondary">Rollback</button>
+          </div>
+          <div class="list" id="cfg-list"></div>
+          <div class="list" id="cfg-active-view"></div>
+        </div>
 
-        <section id="policies" class="section">
-          <div class="section-header">
-            <h2>Policies</h2>
-            <span class="pill">Reliability</span>
+        <div id="panel-policies" class="panel">
+          <h4>Policies</h4>
+          <div class="field">
+            <label>Policy name</label>
+            <input id="policy-name" value="ui-policy" />
           </div>
-          <div class="card">
-            <div class="fields">
-              <div class="field">
-                <label>Policy name</label>
-                <input id="policy-name" value="ui-policy" />
-              </div>
-              <div class="field">
-                <label>Reason</label>
-                <input id="policy-reason" placeholder="reason" />
-              </div>
-            </div>
-            <label class="muted">Policy JSON</label>
-            <textarea id="policy-json">{\n  "retry_json": {"max_attempts": 3, "base_ms": 250, "max_ms": 2000}\n}</textarea>
-            <div class="toolbar">
-              <button id="policy-create">Create policy</button>
-              <button id="policy-load" class="secondary">Load policies</button>
-            </div>
-            <div class="list" id="policy-list"></div>
+          <div class="field">
+            <label>Reason</label>
+            <input id="policy-reason" placeholder="reason" />
           </div>
-        </section>
+          <label class="muted">Policy JSON</label>
+          <textarea id="policy-json">{\n  "retry_json": {"max_attempts": 3, "base_ms": 250, "max_ms": 2000}\n}</textarea>
+          <div class="toolbar">
+            <button id="policy-create">Create policy</button>
+            <button id="policy-load" class="secondary">Load policies</button>
+          </div>
+          <div class="list" id="policy-list"></div>
+        </div>
 
-        <section id="connectors" class="section">
-          <div class="section-header">
-            <h2>Connectors</h2>
-            <span class="pill">Integrations</span>
+        <div id="panel-connectors" class="panel">
+          <h4>Connectors</h4>
+          <div class="field">
+            <label>Name</label>
+            <input id="connector-name-ui" value="ui-connector" />
           </div>
-          <div class="card">
-            <div class="fields">
-              <div class="field">
-                <label>Name</label>
-                <input id="connector-name-ui" value="ui-connector" />
-              </div>
-              <div class="field">
-                <label>Type</label>
-                <input id="connector-type" value="http" />
-              </div>
-              <div class="field">
-                <label>Policy ID (optional)</label>
-                <input id="connector-policy-id" placeholder="uuid" />
-              </div>
-              <div class="field">
-                <label>Secret Ref ID (optional)</label>
-                <input id="connector-secret-id" placeholder="uuid" />
-              </div>
-              <div class="field">
-                <label>Reason</label>
-                <input id="connector-reason" placeholder="reason" />
-              </div>
-            </div>
-            <label class="muted">Settings JSON</label>
-            <textarea id="connector-settings">{\n  "base_url": "https://postman-echo.com",\n  "method": "POST"\n}</textarea>
-            <div class="toolbar">
-              <button id="connector-create">Create connector</button>
-              <button id="connector-load" class="secondary">Load connectors</button>
-            </div>
-            <div class="list" id="connector-list"></div>
+          <div class="field">
+            <label>Type</label>
+            <input id="connector-type" value="http" />
           </div>
-        </section>
+          <div class="field">
+            <label>Policy ID (optional)</label>
+            <input id="connector-policy-id" placeholder="uuid" />
+          </div>
+          <div class="field">
+            <label>Secret Ref ID (optional)</label>
+            <input id="connector-secret-id" placeholder="uuid" />
+          </div>
+          <div class="field">
+            <label>Reason</label>
+            <input id="connector-reason" placeholder="reason" />
+          </div>
+          <label class="muted">Settings JSON</label>
+          <textarea id="connector-settings">{\n  "base_url": "https://postman-echo.com",\n  "method": "POST"\n}</textarea>
+          <div class="toolbar">
+            <button id="connector-create">Create connector</button>
+            <button id="connector-load" class="secondary">Load connectors</button>
+          </div>
+          <div class="list" id="connector-list"></div>
+        </div>
 
-        <section id="webhooks" class="section">
-          <div class="section-header">
-            <h2>Webhook Inbox</h2>
-            <span class="pill">Ingress</span>
+        <div id="panel-webhooks" class="panel">
+          <h4>Webhook Inbox</h4>
+          <div class="field">
+            <label>Limit</label>
+            <input id="inbox-limit" value="50" />
           </div>
-          <div class="card">
-            <div class="fields">
-              <div class="field">
-                <label>Limit</label>
-                <input id="inbox-limit" value="50" />
-              </div>
-              <div class="field">
-                <label>Provider</label>
-                <input id="inbox-provider" placeholder="stripe" />
-              </div>
-              <div class="field">
-                <label>Status</label>
-                <input id="inbox-status" placeholder="received" />
-              </div>
-              <div class="field">
-                <label>Event ID</label>
-                <input id="inbox-event" placeholder="evt_..." />
-              </div>
-            </div>
-            <div class="toolbar">
-              <button id="inbox-load">Load inbox</button>
-            </div>
-            <div class="list" id="inbox-list"></div>
+          <div class="field">
+            <label>Provider</label>
+            <input id="inbox-provider" placeholder="stripe" />
           </div>
-        </section>
+          <div class="field">
+            <label>Status</label>
+            <input id="inbox-status" placeholder="received" />
+          </div>
+          <div class="field">
+            <label>Event ID</label>
+            <input id="inbox-event" placeholder="evt_..." />
+          </div>
+          <div class="toolbar">
+            <button id="inbox-load">Load inbox</button>
+          </div>
+          <div class="list" id="inbox-list"></div>
+        </div>
 
-        <section id="dlq" class="section">
-          <div class="section-header">
-            <h2>DLQ</h2>
-            <span class="pill">Recovery</span>
+        <div id="panel-dlq" class="panel">
+          <h4>DLQ</h4>
+          <div class="field">
+            <label>Queue</label>
+            <input id="dlq-queue" value="default" />
           </div>
-          <div class="card">
-            <div class="fields">
-              <div class="field">
-                <label>Queue</label>
-                <input id="dlq-queue" value="default" />
-              </div>
-              <div class="field">
-                <label>Job ID</label>
-                <input id="dlq-job-id" placeholder="job id" />
-              </div>
-              <div class="field">
-                <label>Reason</label>
-                <input id="dlq-reason" placeholder="reason" />
-              </div>
-            </div>
-            <div class="toolbar">
-              <button id="dlq-load" class="secondary">Load DLQ</button>
-              <button id="dlq-replay">Replay job</button>
-              <button id="dlq-purge" class="danger">Purge queue</button>
-            </div>
-            <div class="list" id="dlq-list"></div>
+          <div class="field">
+            <label>Job ID</label>
+            <input id="dlq-job-id" placeholder="job id" />
           </div>
-        </section>
+          <div class="field">
+            <label>Reason</label>
+            <input id="dlq-reason" placeholder="reason" />
+          </div>
+          <div class="toolbar">
+            <button id="dlq-load" class="secondary">Load DLQ</button>
+            <button id="dlq-replay">Replay job</button>
+            <button id="dlq-purge" class="danger">Purge queue</button>
+          </div>
+          <div class="list" id="dlq-list"></div>
+        </div>
 
-        <section id="audit" class="section">
-          <div class="section-header">
-            <h2>Audit</h2>
-            <span class="pill">Operator actions</span>
+        <div id="panel-audit" class="panel">
+          <h4>Audit</h4>
+          <div class="field">
+            <label>Limit</label>
+            <input id="audit-limit" value="50" />
           </div>
-          <div class="card">
-            <div class="fields">
-              <div class="field">
-                <label>Limit</label>
-                <input id="audit-limit" value="50" />
-              </div>
-              <div class="field">
-                <label>Action (optional)</label>
-                <input id="audit-action" placeholder="connector.create" />
-              </div>
-              <div class="field">
-                <label>Operator ID (optional)</label>
-                <input id="audit-operator" placeholder="uuid" />
-              </div>
-            </div>
-            <div class="toolbar">
-              <button id="audit-load">Load audit logs</button>
-            </div>
-            <div class="list" id="audit-list"></div>
+          <div class="field">
+            <label>Action (optional)</label>
+            <input id="audit-action" placeholder="connector.create" />
           </div>
-        </section>
+          <div class="field">
+            <label>Operator ID (optional)</label>
+            <input id="audit-operator" placeholder="uuid" />
+          </div>
+          <div class="toolbar">
+            <button id="audit-load">Load audit logs</button>
+          </div>
+          <div class="list" id="audit-list"></div>
+        </div>
 
-        <section id="events" class="section">
-          <div class="section-header">
-            <h2>Events</h2>
-            <span class="pill">SSE stream</span>
+        <div id="panel-events" class="panel">
+          <h4>Events</h4>
+          <div class="toolbar">
+            <button id="connect">Connect SSE</button>
+            <button id="load" class="secondary">Load last 50</button>
           </div>
-          <div class="card">
-            <div class="toolbar">
-              <button id="connect">Connect SSE</button>
-              <button id="load" class="secondary">Load last 50</button>
-            </div>
-            <ul id="events"></ul>
-          </div>
-        </section>
-      </div>
+          <ul id="events"></ul>
+        </div>
+      </aside>
     </div>
+
     <div class="modal" id="confirm-modal" role="dialog" aria-modal="true">
       <div class="modal-card">
         <h3 id="confirm-title">Confirm action</h3>
@@ -839,7 +742,17 @@
         </div>
       </div>
     </div>
+
     <script>
+      const canvas = document.getElementById('canvas');
+      const edgesSvg = document.getElementById('edges');
+      const inspectEmpty = document.getElementById('inspect-empty');
+      const inspectForm = document.getElementById('inspect-form');
+      const nodeTitle = document.getElementById('node-title');
+      const nodeType = document.getElementById('node-type');
+      const nodeEndpoint = document.getElementById('node-endpoint');
+      const nodeNotes = document.getElementById('node-notes');
+      const panels = document.querySelectorAll('.panel');
       const list = document.getElementById('events');
       const connectBtn = document.getElementById('connect');
       const loadBtn = document.getElementById('load');
@@ -909,6 +822,10 @@
       const confirmMessage = document.getElementById('confirm-message');
       const confirmCancel = document.getElementById('confirm-cancel');
       const confirmAccept = document.getElementById('confirm-accept');
+      const nodes = [];
+      const edges = [];
+      let activeNode = null;
+      let pendingConnection = null;
       const state = { policyId: null, connectorId: null };
       let source = null;
 
@@ -920,6 +837,166 @@
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#39;');
       }
+
+      function showPanel(panelId) {
+        panels.forEach((panel) => panel.classList.remove('active'));
+        const target = document.getElementById(panelId);
+        if (target) target.classList.add('active');
+      }
+
+      function createNode({ title, type, endpoint, panel }) {
+        const node = document.createElement('div');
+        node.className = 'node';
+        node.style.left = `${40 + nodes.length * 40}px`;
+        node.style.top = `${40 + nodes.length * 40}px`;
+        node.dataset.type = type;
+        node.dataset.endpoint = endpoint || '';
+        node.dataset.notes = '';
+        node.dataset.panel = panel || 'panel-overview';
+
+        node.innerHTML = `
+          <div class="node-title">${title}</div>
+          <div class="node-meta">${endpoint || 'no endpoint'}</div>
+          <div class="port in" title="input"></div>
+          <div class="port out" title="output"></div>
+        `;
+
+        node.addEventListener('mousedown', startDrag);
+        node.addEventListener('click', () => selectNode(node));
+        node.querySelector('.port.out').addEventListener('click', (event) => {
+          event.stopPropagation();
+          beginConnection(node);
+        });
+        node.querySelector('.port.in').addEventListener('click', (event) => {
+          event.stopPropagation();
+          completeConnection(node);
+        });
+
+        canvas.appendChild(node);
+        nodes.push(node);
+        selectNode(node);
+        renderEdges();
+      }
+
+      function selectNode(node) {
+        nodes.forEach((n) => n.classList.remove('selected'));
+        node.classList.add('selected');
+        activeNode = node;
+        inspectEmpty.style.display = 'none';
+        inspectForm.style.display = 'block';
+        nodeTitle.value = node.querySelector('.node-title').textContent;
+        nodeType.value = node.dataset.type;
+        nodeEndpoint.value = node.dataset.endpoint;
+        nodeNotes.value = node.dataset.notes || '';
+        showPanel(node.dataset.panel);
+      }
+
+      function updateNode() {
+        if (!activeNode) return;
+        activeNode.dataset.type = nodeType.value;
+        activeNode.dataset.endpoint = nodeEndpoint.value;
+        activeNode.dataset.notes = nodeNotes.value;
+        activeNode.querySelector('.node-title').textContent = nodeTitle.value;
+        activeNode.querySelector('.node-meta').textContent = nodeEndpoint.value || 'no endpoint';
+        renderEdges();
+      }
+
+      [nodeTitle, nodeType, nodeEndpoint, nodeNotes].forEach((el) =>
+        el.addEventListener('input', updateNode)
+      );
+
+      function startDrag(event) {
+        const node = event.currentTarget;
+        const startX = event.clientX - node.offsetLeft;
+        const startY = event.clientY - node.offsetTop;
+
+        function onMove(e) {
+          node.style.left = `${e.clientX - startX}px`;
+          node.style.top = `${e.clientY - startY}px`;
+          renderEdges();
+        }
+
+        function onUp() {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+        }
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      }
+
+      function beginConnection(node) {
+        pendingConnection = node;
+        node.querySelector('.port.out').classList.add('active');
+      }
+
+      function completeConnection(targetNode) {
+        if (!pendingConnection || pendingConnection === targetNode) return;
+        edges.push({ from: pendingConnection, to: targetNode });
+        pendingConnection.querySelector('.port.out').classList.remove('active');
+        pendingConnection = null;
+        renderEdges();
+      }
+
+      function renderEdges() {
+        const rect = canvas.getBoundingClientRect();
+        edgesSvg.setAttribute('width', rect.width);
+        edgesSvg.setAttribute('height', rect.height);
+        edgesSvg.innerHTML = '';
+        edges.forEach((edge) => {
+          const from = edge.from.getBoundingClientRect();
+          const to = edge.to.getBoundingClientRect();
+          const startX = from.right - rect.left;
+          const startY = from.top - rect.top + from.height / 2;
+          const endX = to.left - rect.left;
+          const endY = to.top - rect.top + to.height / 2;
+          const midX = (startX + endX) / 2;
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute(
+            'd',
+            `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`
+          );
+          path.setAttribute('fill', 'none');
+          path.setAttribute('stroke', '#6366f1');
+          path.setAttribute('stroke-width', '2');
+          edgesSvg.appendChild(path);
+        });
+      }
+
+      document.getElementById('add-api').addEventListener('click', () =>
+        createNode({ title: 'API Call', type: 'api', endpoint: 'POST /execute', panel: 'panel-happy-path' })
+      );
+      document.getElementById('add-policy').addEventListener('click', () =>
+        createNode({ title: 'Policy', type: 'policy', endpoint: 'retry + timeout', panel: 'panel-policies' })
+      );
+      document.getElementById('add-webhook').addEventListener('click', () =>
+        createNode({ title: 'Webhook', type: 'webhook', endpoint: '/webhooks/stripe', panel: 'panel-webhooks' })
+      );
+      document.getElementById('add-workspace').addEventListener('click', () =>
+        createNode({ title: 'Workspace', type: 'workspace', endpoint: 'buildos-dev', panel: 'panel-workspaces' })
+      );
+      document.getElementById('reset').addEventListener('click', () => {
+        nodes.forEach((node) => node.remove());
+        nodes.length = 0;
+        edges.length = 0;
+        edgesSvg.innerHTML = '';
+        activeNode = null;
+        inspectForm.style.display = 'none';
+        inspectEmpty.style.display = 'block';
+        showPanel('panel-overview');
+      });
+
+      createNode({ title: 'Overview', type: 'workspace', endpoint: 'status', panel: 'panel-overview' });
+      createNode({ title: 'Workspaces', type: 'workspace', endpoint: 'POST /workspaces', panel: 'panel-workspaces' });
+      createNode({ title: 'Bundle', type: 'config', endpoint: '/bundle/import', panel: 'panel-bundle' });
+      createNode({ title: 'Happy Path', type: 'api', endpoint: '/execute', panel: 'panel-happy-path' });
+      createNode({ title: 'Configs', type: 'config', endpoint: '/configs', panel: 'panel-configs' });
+      createNode({ title: 'Policies', type: 'policy', endpoint: '/policies', panel: 'panel-policies' });
+      createNode({ title: 'Connectors', type: 'api', endpoint: '/connectors', panel: 'panel-connectors' });
+      createNode({ title: 'Webhooks', type: 'webhook', endpoint: '/webhooks/stripe', panel: 'panel-webhooks' });
+      createNode({ title: 'DLQ', type: 'dlq', endpoint: '/admin/dlq', panel: 'panel-dlq' });
+      createNode({ title: 'Audit', type: 'api', endpoint: '/audit-logs', panel: 'panel-audit' });
+      createNode({ title: 'Events', type: 'api', endpoint: '/events/stream', panel: 'panel-events' });
 
       function addEvent(data) {
         const li = document.createElement('li');
