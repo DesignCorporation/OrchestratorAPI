@@ -32,6 +32,9 @@ services:
     build:
       context: ../..
       dockerfile: services/orchestrator-api/Dockerfile
+      target: base
+    working_dir: /app
+    command: ["pnpm", "-C", "services/orchestrator-api", "dev"]
     environment:
       DATABASE_URL: postgres://orchestrator:orchestrator@postgres:5432/orchestrator
       REDIS_URL: redis://redis:6379
@@ -71,11 +74,16 @@ services:
       - internal
     ports:
       - "4100:4100"
+    volumes:
+      - ../..:/app
 
   orchestrator-worker:
     build:
       context: ../..
       dockerfile: services/orchestrator-worker/Dockerfile
+      target: base
+    working_dir: /app
+    command: ["pnpm", "-C", "services/orchestrator-worker", "dev"]
     environment:
       DATABASE_URL: postgres://orchestrator:orchestrator@postgres:5432/orchestrator
       REDIS_URL: redis://redis:6379
@@ -93,11 +101,16 @@ services:
         condition: service_healthy
     networks:
       - internal
+    volumes:
+      - ../..:/app
 
   operator-console:
     build:
       context: ../..
       dockerfile: services/operator-console/Dockerfile
+      target: base
+    working_dir: /app
+    command: ["pnpm", "-C", "services/operator-console", "dev"]
     environment:
       PORT: 4102
       NODE_ENV: development
@@ -113,6 +126,8 @@ services:
       - internal
     ports:
       - "4102:4102"
+    volumes:
+      - ../..:/app
 
   orchestrator-migrate:
     image: postgres:16-alpine
